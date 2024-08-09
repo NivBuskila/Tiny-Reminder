@@ -1,5 +1,6 @@
 package com.example.tinyreminder.adapters;
 
+import android.graphics.Bitmap;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,9 +10,9 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.example.tinyreminder.R;
 import com.example.tinyreminder.models.FamilyMember;
+import com.example.tinyreminder.utils.AvatarUtils;
 
 import java.util.List;
 
@@ -61,11 +62,16 @@ public class FamilyMemberAdapter extends RecyclerView.Adapter<FamilyMemberAdapte
 
         void bind(FamilyMember member, OnMemberClickListener listener) {
             nameTextView.setText(member.getName());
-            Glide.with(itemView.getContext())
-                    .load(member.getAvatarUrl())
-                    .placeholder(R.drawable.default_avatar)
-                    .error(R.drawable.default_avatar)
-                    .into(avatarImageView);
+
+            // Use AvatarUtils to load the avatar
+            AvatarUtils.loadAvatarData(member.getId(), member.getName(), (initials, color) -> {
+                if (initials != null && color != 0) {
+                    Bitmap avatarBitmap = AvatarUtils.createAvatarBitmap(initials, color, 200);
+                    avatarImageView.setImageBitmap(avatarBitmap);
+                } else {
+                    avatarImageView.setImageResource(R.drawable.default_avatar);
+                }
+            });
 
             itemView.setOnClickListener(v -> listener.onMemberClick(member));
         }

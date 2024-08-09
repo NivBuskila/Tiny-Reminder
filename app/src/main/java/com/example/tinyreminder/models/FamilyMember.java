@@ -9,10 +9,9 @@ public class FamilyMember {
         // Default constructor required for calls to DataSnapshot.getValue(FamilyMember.class)
     }
 
-    public FamilyMember(String id, String name, String avatarUrl) {
+    public FamilyMember(String id, String name) {
         this.id = id;
         this.name = name;
-        this.avatarUrl = avatarUrl;
     }
 
     public String getId() {
@@ -31,11 +30,5 @@ public class FamilyMember {
         this.name = name;
     }
 
-    public String getAvatarUrl() {
-        return avatarUrl;
-    }
 
-    public void setAvatarUrl(String avatarUrl) {
-        this.avatarUrl = avatarUrl;
-    }
 }
