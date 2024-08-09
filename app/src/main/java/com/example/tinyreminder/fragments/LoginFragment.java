@@ -25,8 +25,10 @@ import com.firebase.ui.auth.IdpResponse;
 import com.firebase.ui.auth.data.model.FirebaseAuthUIAuthenticationResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.example.tinyreminder.models.User;
-import com.example.tinyreminder.utils.DatabaseManager;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.ValueEventListener;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -39,6 +41,8 @@ public class LoginFragment extends Fragment {
             this::onSignInResult
     );
 
+    private DatabaseManager dbManager;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -49,6 +53,7 @@ public class LoginFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        dbManager = new DatabaseManager();
         signIn();
     }
 
@@ -75,27 +80,70 @@ public class LoginFragment extends Fragment {
             FirebaseUser firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
             if (firebaseUser != null) {
                 String userId = firebaseUser.getUid();
-                User user = new User();
-                user.setId(userId);
-                user.setName(firebaseUser.getDisplayName());
-                user.setEmail(firebaseUser.getEmail());
-                user.setPhoneNumber(firebaseUser.getPhoneNumber());
-
-                DatabaseManager dbManager = new DatabaseManager();
-                dbManager.createUser(user, task -> {
-                    if (task.isSuccessful()) {
-                        Log.d(TAG, "User created successfully");
-                        checkAndCreateUserAvatar(firebaseUser);
-                        ((MainActivity) requireActivity()).navigateToProfile();
-                    } else {
-                        Log.e(TAG, "Failed to create user", task.getException());
-                        Toast.makeText(requireContext(), "Failed to create user", Toast.LENGTH_SHORT).show();
-                    }
-                });
+                checkExistingUser(userId, firebaseUser);
             }
         } else {
             handleSignInError(response);
         }
+    }
+
+    private void checkExistingUser(String userId, FirebaseUser firebaseUser) {
+        dbManager.getUserData(userId, new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    User existingUser = dataSnapshot.getValue(User.class);
+                    updateExistingUser(existingUser, firebaseUser);
+                } else {
+                    createNewUser(userId, firebaseUser);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e(TAG, "Error checking existing user", databaseError.toException());
+                Toast.makeText(requireContext(), "Error during sign in", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void updateExistingUser(User existingUser, FirebaseUser firebaseUser) {
+        existingUser.setName(firebaseUser.getDisplayName());
+        existingUser.setEmail(firebaseUser.getEmail());
+        if (existingUser.getPhoneNumber() == null || existingUser.getPhoneNumber().isEmpty()) {
+            existingUser.setPhoneNumber(firebaseUser.getPhoneNumber());
+        }
+
+        dbManager.updateUserProfile(existingUser.getId(), existingUser.toMap(), task -> {
+            if (task.isSuccessful()) {
+                Log.d(TAG, "User updated successfully");
+                checkAndCreateUserAvatar(existingUser.getId(), existingUser.getName());
+                ((MainActivity) requireActivity()).navigateToProfile();
+            } else {
+                Log.e(TAG, "Failed to update user", task.getException());
+                Toast.makeText(requireContext(), "Failed to update user", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void createNewUser(String userId, FirebaseUser firebaseUser) {
+        User newUser = new User(
+                userId,
+                firebaseUser.getDisplayName(),
+                firebaseUser.getEmail(),
+                firebaseUser.getPhoneNumber()
+        );
+
+        dbManager.createUser(newUser, task -> {
+            if (task.isSuccessful()) {
+                Log.d(TAG, "User created successfully");
+                checkAndCreateUserAvatar(userId, newUser.getName());
+                ((MainActivity) requireActivity()).navigateToProfile();
+            } else {
+                Log.e(TAG, "Failed to create user", task.getException());
+                Toast.makeText(requireContext(), "Failed to create user", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void handleSignInError(IdpResponse response) {
@@ -109,27 +157,12 @@ public class LoginFragment extends Fragment {
         }
     }
 
-    private void checkAndCreateUserAvatar(FirebaseUser firebaseUser) {
-        String userId = firebaseUser.getUid();
-        String displayName = firebaseUser.getDisplayName();
-        String email = firebaseUser.getEmail();
-        String phoneNumber = firebaseUser.getPhoneNumber();
-
-        DatabaseManager dbManager = new DatabaseManager();
-        User user = new User(userId, displayName, email, phoneNumber);
-
-        dbManager.createOrUpdateUser(user, task -> {
-            if (task.isSuccessful()) {
-                Log.d(TAG, "User created/updated successfully");
-                AvatarUtils.loadAvatarData(userId, displayName, (initials, color) -> {
-                    if (initials == null || color == 0) {
-                        String newInitials = AvatarUtils.getInitials(displayName);
-                        int newColor = AvatarUtils.getRandomColor();
-                        AvatarUtils.saveAvatarData(userId, newInitials, newColor);
-                    }
-                });
-            } else {
-                Log.e(TAG, "Failed to create/update user", task.getException());
+    private void checkAndCreateUserAvatar(String userId, String displayName) {
+        AvatarUtils.loadAvatarData(userId, displayName, (initials, color) -> {
+            if (initials == null || color == 0) {
+                String newInitials = AvatarUtils.getInitials(displayName);
+                int newColor = AvatarUtils.getRandomColor();
+                AvatarUtils.saveAvatarData(userId, newInitials, newColor);
             }
         });
     }

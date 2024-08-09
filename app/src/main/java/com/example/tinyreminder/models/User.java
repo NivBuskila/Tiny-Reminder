@@ -2,6 +2,9 @@ package com.example.tinyreminder.models;
 
 import androidx.annotation.NonNull;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class User {
     private String id;
     private String name;
@@ -102,6 +105,18 @@ public class User {
 
     public void setRelationshipToChildrenEnum(RelationshipToChildren relationshipToChildren) {
         this.relationshipToChildren = relationshipToChildren.name();
+    }
+    // New method to convert User object to a Map
+    public Map<String, Object> toMap() {
+        HashMap<String, Object> result = new HashMap<>();
+        result.put("id", id);
+        result.put("name", name);
+        result.put("email", email);
+        result.put("phoneNumber", phoneNumber);
+        result.put("avatarUrl", avatarUrl);
+        result.put("familyId", familyId);
+        result.put("relationshipToChildren", relationshipToChildren);
+        return result;
     }
 
     @NonNull
