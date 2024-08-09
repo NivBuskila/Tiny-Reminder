@@ -16,14 +16,17 @@ import androidx.fragment.app.Fragment;
 
 import com.example.tinyreminder.MainActivity;
 import com.example.tinyreminder.R;
+import com.example.tinyreminder.models.User;
 import com.example.tinyreminder.utils.AvatarUtils;
+import com.example.tinyreminder.utils.DatabaseManager;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.FirebaseAuthUIActivityResultContract;
 import com.firebase.ui.auth.IdpResponse;
 import com.firebase.ui.auth.data.model.FirebaseAuthUIAuthenticationResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-
+import com.example.tinyreminder.models.User;
+import com.example.tinyreminder.utils.DatabaseManager;
 import java.util.Arrays;
 import java.util.List;
 
@@ -69,10 +72,26 @@ public class LoginFragment extends Fragment {
     private void onSignInResult(FirebaseAuthUIAuthenticationResult result) {
         IdpResponse response = result.getIdpResponse();
         if (result.getResultCode() == Activity.RESULT_OK) {
-            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            if (user != null) {
-                checkAndCreateUserAvatar(user);
-                ((MainActivity) requireActivity()).navigateToProfile();
+            FirebaseUser firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
+            if (firebaseUser != null) {
+                String userId = firebaseUser.getUid();
+                User user = new User();
+                user.setId(userId);
+                user.setName(firebaseUser.getDisplayName());
+                user.setEmail(firebaseUser.getEmail());
+                user.setPhoneNumber(firebaseUser.getPhoneNumber());
+
+                DatabaseManager dbManager = new DatabaseManager();
+                dbManager.createUser(user, task -> {
+                    if (task.isSuccessful()) {
+                        Log.d(TAG, "User created successfully");
+                        checkAndCreateUserAvatar(firebaseUser);
+                        ((MainActivity) requireActivity()).navigateToProfile();
+                    } else {
+                        Log.e(TAG, "Failed to create user", task.getException());
+                        Toast.makeText(requireContext(), "Failed to create user", Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
         } else {
             handleSignInError(response);
@@ -90,12 +109,27 @@ public class LoginFragment extends Fragment {
         }
     }
 
-    private void checkAndCreateUserAvatar(FirebaseUser user) {
-        AvatarUtils.loadAvatarData(user.getUid(), (initials, color) -> {
-            if (initials == null || color == 0) {
-                String newInitials = AvatarUtils.getInitials(user.getDisplayName());
-                int newColor = AvatarUtils.getRandomColor();
-                AvatarUtils.saveAvatarData(user.getUid(), newInitials, newColor);
+    private void checkAndCreateUserAvatar(FirebaseUser firebaseUser) {
+        String userId = firebaseUser.getUid();
+        String displayName = firebaseUser.getDisplayName();
+        String email = firebaseUser.getEmail();
+        String phoneNumber = firebaseUser.getPhoneNumber();
+
+        DatabaseManager dbManager = new DatabaseManager();
+        User user = new User(userId, displayName, email, phoneNumber);
+
+        dbManager.createOrUpdateUser(user, task -> {
+            if (task.isSuccessful()) {
+                Log.d(TAG, "User created/updated successfully");
+                AvatarUtils.loadAvatarData(userId, displayName, (initials, color) -> {
+                    if (initials == null || color == 0) {
+                        String newInitials = AvatarUtils.getInitials(displayName);
+                        int newColor = AvatarUtils.getRandomColor();
+                        AvatarUtils.saveAvatarData(userId, newInitials, newColor);
+                    }
+                });
+            } else {
+                Log.e(TAG, "Failed to create/update user", task.getException());
             }
         });
     }

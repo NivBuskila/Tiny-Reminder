@@ -22,7 +22,9 @@ public class DatabaseManager {
     }
 
     public void createUser(User user, final OnCompleteListener<Void> listener) {
-        mDatabase.child("users").child(user.getId()).setValue(user)
+        String userId = mDatabase.child("users").push().getKey();
+        user.setId(userId);
+        mDatabase.child("users").child(userId).setValue(user)
                 .addOnCompleteListener(listener);
     }
 
@@ -75,5 +77,9 @@ public class DatabaseManager {
         locationUpdates.put("latitude", latitude);
         locationUpdates.put("longitude", longitude);
         mDatabase.child("locations").child(userId).setValue(locationUpdates);
+    }
+    public void createOrUpdateUser(User user, final OnCompleteListener<Void> listener) {
+        mDatabase.child("users").child(user.getId()).setValue(user)
+                .addOnCompleteListener(listener);
     }
 }

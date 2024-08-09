@@ -110,39 +110,31 @@ public class ProfileFragment extends Fragment {
     }
 
     private void loadUserData() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
             String userId = currentUser.getUid();
+            Log.d(TAG, "Loading user data for userId: " + userId); // הוסף את זה
             dbManager.getUserData(userId, new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     User user = snapshot.getValue(User.class);
                     if (user != null) {
+                        Log.d(TAG, "User data loaded successfully"); // הוסף את זה
                         updateUIWithUserData(user);
-                        if (user.getFamilyId() != null) {
-                            loadFamilyData(user.getFamilyId());
-                        } else {
-                            showCreateJoinFamilyButton();
-                        }
                     } else {
                         Log.e(TAG, "User data is null");
-                        Toast.makeText(getContext(), "Failed to load user data", Toast.LENGTH_SHORT).show();
                     }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
                     Log.e(TAG, "Failed to load user data: " + error.getMessage());
-                    Toast.makeText(getContext(), "Failed to load user data", Toast.LENGTH_SHORT).show();
                 }
             });
         } else {
             Log.e(TAG, "Current user is null");
-            Toast.makeText(getContext(), "No user logged in", Toast.LENGTH_SHORT).show();
-            ((MainActivity) requireActivity()).navigateToLogin();
         }
     }
-
     private void loadFamilyData(String familyId) {
         if (familyId == null || familyId.isEmpty()) {
             Log.e(TAG, "Family ID is null or empty");
@@ -172,6 +164,13 @@ public class ProfileFragment extends Fragment {
     }
 
     private void updateUIWithUserData(User user) {
+        if (user == null) {
+            Log.e(TAG, "User object is null");
+            return;
+        }
+
+        Log.d(TAG, "Updating UI with user data: " + user.getId()); // הוסף את זה
+
         profileName.setText(user.getName());
         profileEmail.setText(user.getEmail());
         profilePhone.setText(user.getPhoneNumber());
@@ -181,23 +180,19 @@ public class ProfileFragment extends Fragment {
                     .getPosition(relationship);
             relationshipSpinner.setSelection(spinnerPosition);
         }
-        loadAndDisplayAvatar(user.getId());
-    }
 
-    private void loadAndDisplayAvatar(String userId) {
+        String userId = user.getId();
         if (userId == null || userId.isEmpty()) {
             Log.e(TAG, "User ID is null or empty");
             return;
         }
 
-        AvatarUtils.loadAvatarData(userId, (initials, color) -> {
+        loadAndDisplayAvatar(userId, user.getName());
+    }
+    private void loadAndDisplayAvatar(String userId, String name) {
+        AvatarUtils.loadAvatarData(userId, name, (initials, color) -> {
             if (initials != null && color != 0) {
                 profileImage.setImageBitmap(AvatarUtils.createAvatarBitmap(initials, color, 200));
-            } else {
-                String newInitials = AvatarUtils.getInitials(profileName.getText().toString());
-                int newColor = AvatarUtils.getRandomColor();
-                profileImage.setImageBitmap(AvatarUtils.createAvatarBitmap(newInitials, newColor, 200));
-                AvatarUtils.saveAvatarData(userId, newInitials, newColor);
             }
         });
     }

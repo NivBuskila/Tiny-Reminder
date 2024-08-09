@@ -77,12 +77,14 @@ public class AvatarUtils {
         void onAvatarDataLoaded(String initials, int color);
     }
 
-    public static void loadAvatarData(String userId, OnAvatarDataLoadedListener listener) {
+    public static void loadAvatarData(String userId, String name, OnAvatarDataLoadedListener listener) {
         if (userId == null || userId.isEmpty()) {
             Log.e(TAG, "Cannot load avatar data: userId is null or empty");
             listener.onAvatarDataLoaded(null, 0);
             return;
         }
+
+        Log.d(TAG, "Loading avatar data for user: " + userId);
 
         DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(userId);
         userRef.child("avatar").addListenerForSingleValueEvent(new ValueEventListener() {
@@ -91,9 +93,16 @@ public class AvatarUtils {
                 if (dataSnapshot.exists()) {
                     String initials = dataSnapshot.child("initials").getValue(String.class);
                     Integer color = dataSnapshot.child("color").getValue(Integer.class);
-                    listener.onAvatarDataLoaded(initials, color != null ? color : 0);
+                    Log.d(TAG, "Avatar data loaded: initials = " + initials + ", color = " + color);
+                    if (initials != null && color != null) {
+                        listener.onAvatarDataLoaded(initials, color);
+                    } else {
+                        Log.d(TAG, "Avatar data incomplete, creating new avatar");
+                        createAndSaveNewAvatar(userId, name, listener);
+                    }
                 } else {
-                    listener.onAvatarDataLoaded(null, 0);
+                    Log.d(TAG, "No avatar data found, creating new avatar");
+                    createAndSaveNewAvatar(userId, name, listener);
                 }
             }
 
@@ -103,5 +112,11 @@ public class AvatarUtils {
                 listener.onAvatarDataLoaded(null, 0);
             }
         });
+    }
+    private static void createAndSaveNewAvatar(String userId, String name, OnAvatarDataLoadedListener listener) {
+        String newInitials = getInitials(name);
+        int newColor = getRandomColor();
+        saveAvatarData(userId, newInitials, newColor);
+        listener.onAvatarDataLoaded(newInitials, newColor);
     }
 }
