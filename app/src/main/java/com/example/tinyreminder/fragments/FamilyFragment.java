@@ -19,6 +19,7 @@ import com.example.tinyreminder.adapters.FamilyMemberAdapter;
 import com.example.tinyreminder.models.FamilyMember;
 import com.example.tinyreminder.models.User;
 import com.example.tinyreminder.utils.DatabaseManager;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
@@ -35,6 +36,8 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     private FamilyMemberAdapter adapter;
     private DatabaseManager dbManager;
     private TextView noMembersTextView;
+    private FloatingActionButton addMemberButton;
+    private FloatingActionButton removeMemberButton;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -50,6 +53,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         super.onViewCreated(view, savedInstanceState);
         dbManager = new DatabaseManager();
         setupRecyclerView();
+        setupButtons();
         loadFamilyMembers();
     }
 
@@ -58,6 +62,24 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         familyMembersList.setAdapter(adapter);
         familyMembersList.setLayoutManager(new LinearLayoutManager(getContext()));
         familyMembersList.setHasFixedSize(true);
+    }
+
+    private void setupButtons() {
+        addMemberButton = requireView().findViewById(R.id.add_family_member_button);
+        removeMemberButton = requireView().findViewById(R.id.remove_family_member_button);
+
+        addMemberButton.setOnClickListener(v -> showAddMemberDialog());
+        removeMemberButton.setOnClickListener(v -> showRemoveMemberDialog());
+    }
+
+    private void showAddMemberDialog() {
+        // TODO: Implement the logic to add a new family member
+        Toast.makeText(getContext(), "Add member functionality to be implemented", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showRemoveMemberDialog() {
+        // TODO: Implement the logic to remove a family member
+        Toast.makeText(getContext(), "Remove member functionality to be implemented", Toast.LENGTH_SHORT).show();
     }
 
     private void loadFamilyMembers() {
@@ -110,7 +132,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
                 if (user != null) {
-                    FamilyMember member = new FamilyMember(user.getId(), user.getName());
+                    FamilyMember member = new FamilyMember(user.getId(), user.getName(), "Member");
                     members.add(member);
                     updateUI(members);
                 }
@@ -140,10 +162,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
 
     @Override
     public void onMemberClick(FamilyMember member) {
-        MapFragment mapFragment = MapFragment.newInstance(member.getId());
-        getParentFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, mapFragment)
-                .addToBackStack(null)
-                .commit();
+        // TODO: Implement navigation to MapFragment or member details
+        Toast.makeText(getContext(), "Clicked on " + member.getName(), Toast.LENGTH_SHORT).show();
     }
 }

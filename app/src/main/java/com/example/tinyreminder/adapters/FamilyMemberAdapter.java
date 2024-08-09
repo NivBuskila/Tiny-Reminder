@@ -52,18 +52,22 @@ public class FamilyMemberAdapter extends RecyclerView.Adapter<FamilyMemberAdapte
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView nameTextView;
+        TextView roleTextView;
         ImageView avatarImageView;
+        ImageView statusIndicator;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
             nameTextView = itemView.findViewById(R.id.member_name);
+            roleTextView = itemView.findViewById(R.id.member_role);
             avatarImageView = itemView.findViewById(R.id.member_avatar);
+            statusIndicator = itemView.findViewById(R.id.status_indicator);
         }
 
         void bind(FamilyMember member, OnMemberClickListener listener) {
             nameTextView.setText(member.getName());
+            roleTextView.setText(member.getRole());
 
-            // Use AvatarUtils to load the avatar
             AvatarUtils.loadAvatarData(member.getId(), member.getName(), (initials, color) -> {
                 if (initials != null && color != 0) {
                     Bitmap avatarBitmap = AvatarUtils.createAvatarBitmap(initials, color, 200);
@@ -72,6 +76,18 @@ public class FamilyMemberAdapter extends RecyclerView.Adapter<FamilyMemberAdapte
                     avatarImageView.setImageResource(R.drawable.default_avatar);
                 }
             });
+
+            switch (member.getResponseStatus()) {
+                case OK:
+                    statusIndicator.setImageResource(R.drawable.ic_status_green);
+                    break;
+                case PENDING:
+                    statusIndicator.setImageResource(R.drawable.ic_status_orange);
+                    break;
+                case ALERT:
+                    statusIndicator.setImageResource(R.drawable.ic_status_red);
+                    break;
+            }
 
             itemView.setOnClickListener(v -> listener.onMemberClick(member));
         }
