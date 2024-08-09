@@ -40,18 +40,6 @@
             android:layout_marginTop="8dp"/>
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Relationship to Children:"
-            android:layout_marginTop="16dp"/>
-
-        <Spinner
-            android:id="@+id/relationship_spinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"/>
-
-        <TextView
             android:id="@+id/family_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

@@ -2,7 +2,6 @@ package com.example.tinyreminder.utils;
 
 import androidx.annotation.NonNull;
 import com.example.tinyreminder.models.Family;
-import com.example.tinyreminder.models.RelationshipToChildren;
 import com.example.tinyreminder.models.User;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.firebase.database.DataSnapshot;
@@ -32,6 +31,7 @@ public class DatabaseManager {
         mDatabase.child("users").child(userId).updateChildren(updates)
                 .addOnCompleteListener(listener);
     }
+
     public String createNewFamily(String familyName) {
         String familyId = mDatabase.child("families").push().getKey();
         Family family = new Family(familyId, familyName);
@@ -39,11 +39,9 @@ public class DatabaseManager {
         return familyId;
     }
 
-    public void addUserToFamily(String userId, String familyId, RelationshipToChildren relationship,
-                                final OnCompleteListener<Void> listener) {
+    public void addUserToFamily(String userId, String familyId, final OnCompleteListener<Void> listener) {
         Map<String, Object> updates = new HashMap<>();
         updates.put("/users/" + userId + "/familyId", familyId);
-        updates.put("/users/" + userId + "/relationshipToChildren", relationship.name());
         updates.put("/families/" + familyId + "/memberIds/" + userId, true);
 
         mDatabase.updateChildren(updates).addOnCompleteListener(listener);
@@ -55,13 +53,6 @@ public class DatabaseManager {
 
     public void getFamilyData(String familyId, final ValueEventListener listener) {
         mDatabase.child("families").child(familyId).addListenerForSingleValueEvent(listener);
-    }
-
-    public void updateUserRelationship(String userId, String relationship,
-                                       final OnCompleteListener<Void> listener) {
-        mDatabase.child("users").child(userId).child("relationshipToChildren")
-                .setValue(relationship)
-                .addOnCompleteListener(listener);
     }
 
     public void getFamilyMembers(String familyId, final ValueEventListener listener) {
@@ -78,6 +69,7 @@ public class DatabaseManager {
         locationUpdates.put("longitude", longitude);
         mDatabase.child("locations").child(userId).setValue(locationUpdates);
     }
+
     public void createOrUpdateUser(User user, final OnCompleteListener<Void> listener) {
         mDatabase.child("users").child(user.getId()).setValue(user)
                 .addOnCompleteListener(listener);

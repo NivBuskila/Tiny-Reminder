@@ -110,7 +110,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
                 if (user != null) {
-                    FamilyMember member = new FamilyMember(user.getId(), user.getName(), user.getAvatarUrl(), user.getRelationshipToChildren());
+                    FamilyMember member = new FamilyMember(user.getId(), user.getName(), user.getAvatarUrl());
                     members.add(member);
                     updateUI(members);
                 }

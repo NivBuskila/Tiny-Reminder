@@ -1,7 +1,6 @@
 package com.example.tinyreminder.models;
 
 import androidx.annotation.NonNull;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,7 +11,6 @@ public class User {
     private String phoneNumber;
     private String avatarUrl;
     private String familyId;
-    private String relationshipToChildren;
 
     // Default constructor required for calls to DataSnapshot.getValue(User.class)
     public User() {}
@@ -26,19 +24,13 @@ public class User {
     }
 
     // Full constructor
-    public User(String id, String name, String email, String phoneNumber, String avatarUrl, String familyId, String relationshipToChildren) {
+    public User(String id, String name, String email, String phoneNumber, String avatarUrl, String familyId) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.phoneNumber = phoneNumber;
         this.avatarUrl = avatarUrl;
         this.familyId = familyId;
-        this.relationshipToChildren = relationshipToChildren;
-    }
-
-    // Constructor with RelationshipToChildren enum
-    public User(String id, String name, String email, String phoneNumber, String avatarUrl, String familyId, RelationshipToChildren relationshipToChildren) {
-        this(id, name, email, phoneNumber, avatarUrl, familyId, relationshipToChildren.name());
     }
 
     // Getters and setters
@@ -90,23 +82,6 @@ public class User {
         this.familyId = familyId;
     }
 
-    public String getRelationshipToChildren() {
-        return relationshipToChildren;
-    }
-
-    public void setRelationshipToChildren(String relationshipToChildren) {
-        this.relationshipToChildren = relationshipToChildren;
-    }
-
-    // Helper methods for RelationshipToChildren enum
-    public RelationshipToChildren getRelationshipToChildrenEnum() {
-        return relationshipToChildren != null ? RelationshipToChildren.valueOf(relationshipToChildren) : null;
-    }
-
-    public void setRelationshipToChildrenEnum(RelationshipToChildren relationshipToChildren) {
-        this.relationshipToChildren = relationshipToChildren.name();
-    }
-    // New method to convert User object to a Map
     public Map<String, Object> toMap() {
         HashMap<String, Object> result = new HashMap<>();
         result.put("id", id);
@@ -115,7 +90,6 @@ public class User {
         result.put("phoneNumber", phoneNumber);
         result.put("avatarUrl", avatarUrl);
         result.put("familyId", familyId);
-        result.put("relationshipToChildren", relationshipToChildren);
         return result;
     }
 
@@ -129,7 +103,6 @@ public class User {
                 ", phoneNumber='" + phoneNumber + '\'' +
                 ", avatarUrl='" + avatarUrl + '\'' +
                 ", familyId='" + familyId + '\'' +
-                ", relationshipToChildren='" + relationshipToChildren + '\'' +
                 '}';
     }
 }

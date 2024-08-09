@@ -6,11 +6,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,7 +19,6 @@ import androidx.fragment.app.Fragment;
 import com.example.tinyreminder.MainActivity;
 import com.example.tinyreminder.R;
 import com.example.tinyreminder.models.Family;
-import com.example.tinyreminder.models.RelationshipToChildren;
 import com.example.tinyreminder.models.User;
 import com.example.tinyreminder.utils.AvatarUtils;
 import com.example.tinyreminder.utils.DatabaseManager;
@@ -39,7 +35,6 @@ public class ProfileFragment extends Fragment {
 
     private CircleImageView profileImage;
     private TextView profileName, profileEmail, profilePhone, familyName, familyCode;
-    private Spinner relationshipSpinner;
     private Button editProfileButton, familyButton, createJoinFamilyButton, logoutButton;
     private DatabaseManager dbManager;
     private FirebaseAuth mAuth;
@@ -72,23 +67,10 @@ public class ProfileFragment extends Fragment {
         profilePhone = view.findViewById(R.id.profile_phone);
         familyName = view.findViewById(R.id.family_name);
         familyCode = view.findViewById(R.id.family_code);
-        relationshipSpinner = view.findViewById(R.id.relationship_spinner);
         editProfileButton = view.findViewById(R.id.edit_profile_button);
         familyButton = view.findViewById(R.id.family_button);
         createJoinFamilyButton = view.findViewById(R.id.create_join_family_button);
         logoutButton = view.findViewById(R.id.logout_button);
-
-        setupRelationshipSpinner();
-    }
-
-    private void setupRelationshipSpinner() {
-        ArrayAdapter<RelationshipToChildren> adapter = new ArrayAdapter<>(
-                requireContext(),
-                android.R.layout.simple_spinner_item,
-                RelationshipToChildren.values()
-        );
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        relationshipSpinner.setAdapter(adapter);
     }
 
     private void setupListeners() {
@@ -96,31 +78,25 @@ public class ProfileFragment extends Fragment {
         familyButton.setOnClickListener(v -> navigateToFamilyScreen());
         createJoinFamilyButton.setOnClickListener(v -> showFamilySelectionDialog());
         logoutButton.setOnClickListener(v -> signOut());
-        relationshipSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                saveUserRelationship();
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                // Do nothing
-            }
-        });
     }
 
     private void loadUserData() {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
             String userId = currentUser.getUid();
-            Log.d(TAG, "Loading user data for userId: " + userId); // הוסף את זה
+            Log.d(TAG, "Loading user data for userId: " + userId);
             dbManager.getUserData(userId, new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     User user = snapshot.getValue(User.class);
                     if (user != null) {
-                        Log.d(TAG, "User data loaded successfully"); // הוסף את זה
+                        Log.d(TAG, "User data loaded successfully");
                         updateUIWithUserData(user);
+                        if (user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
+                            loadFamilyData(user.getFamilyId());
+                        } else {
+                            showCreateJoinFamilyButton();
+                        }
                     } else {
                         Log.e(TAG, "User data is null");
                     }
@@ -135,6 +111,7 @@ public class ProfileFragment extends Fragment {
             Log.e(TAG, "Current user is null");
         }
     }
+
     private void loadFamilyData(String familyId) {
         if (familyId == null || familyId.isEmpty()) {
             Log.e(TAG, "Family ID is null or empty");
@@ -169,17 +146,11 @@ public class ProfileFragment extends Fragment {
             return;
         }
 
-        Log.d(TAG, "Updating UI with user data: " + user.getId()); // הוסף את זה
+        Log.d(TAG, "Updating UI with user data: " + user.getId());
 
         profileName.setText(user.getName());
         profileEmail.setText(user.getEmail());
         profilePhone.setText(user.getPhoneNumber());
-        if (user.getRelationshipToChildren() != null) {
-            RelationshipToChildren relationship = user.getRelationshipToChildrenEnum();
-            int spinnerPosition = ((ArrayAdapter<RelationshipToChildren>) relationshipSpinner.getAdapter())
-                    .getPosition(relationship);
-            relationshipSpinner.setSelection(spinnerPosition);
-        }
 
         String userId = user.getId();
         if (userId == null || userId.isEmpty()) {
@@ -189,6 +160,7 @@ public class ProfileFragment extends Fragment {
 
         loadAndDisplayAvatar(userId, user.getName());
     }
+
     private void loadAndDisplayAvatar(String userId, String name) {
         AvatarUtils.loadAvatarData(userId, name, (initials, color) -> {
             if (initials != null && color != 0) {
@@ -207,22 +179,6 @@ public class ProfileFragment extends Fragment {
     private void showCreateJoinFamilyButton() {
         familyButton.setVisibility(View.GONE);
         createJoinFamilyButton.setVisibility(View.VISIBLE);
-    }
-
-    private void saveUserRelationship() {
-        RelationshipToChildren selectedRelationship =
-                (RelationshipToChildren) relationshipSpinner.getSelectedItem();
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser != null) {
-            String userId = currentUser.getUid();
-            dbManager.updateUserRelationship(userId, selectedRelationship.name(), task -> {
-                if (task.isSuccessful()) {
-                    Toast.makeText(getContext(), "Relationship updated successfully", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(getContext(), "Failed to update relationship", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
     }
 
     private void navigateToEditProfile() {
@@ -256,7 +212,7 @@ public class ProfileFragment extends Fragment {
                 String familyId = dbManager.createNewFamily(familyName);
                 FirebaseUser currentUser = mAuth.getCurrentUser();
                 if (currentUser != null) {
-                    dbManager.addUserToFamily(currentUser.getUid(), familyId, RelationshipToChildren.OTHER, task -> {
+                    dbManager.addUserToFamily(currentUser.getUid(), familyId, task -> {
                         if (task.isSuccessful()) {
                             Toast.makeText(getContext(), "Family created successfully", Toast.LENGTH_SHORT).show();
                             loadUserData();
@@ -295,7 +251,7 @@ public class ProfileFragment extends Fragment {
     private void joinFamily(String familyId) {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
-            dbManager.addUserToFamily(currentUser.getUid(), familyId, RelationshipToChildren.OTHER, task -> {
+            dbManager.addUserToFamily(currentUser.getUid(), familyId, task -> {
                 if (task.isSuccessful()) {
                     Toast.makeText(getContext(), "Joined family successfully", Toast.LENGTH_SHORT).show();
                     loadUserData();
