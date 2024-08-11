@@ -25,6 +25,7 @@ import com.firebase.ui.auth.IdpResponse;
 import com.firebase.ui.auth.data.model.FirebaseAuthUIAuthenticationResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.UserProfileChangeRequest;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.ValueEventListener;
@@ -127,23 +128,48 @@ public class LoginFragment extends Fragment {
     }
 
     private void createNewUser(String userId, FirebaseUser firebaseUser) {
+        final String displayName = firebaseUser.getDisplayName() != null ? firebaseUser.getDisplayName() :
+                (firebaseUser.getEmail() != null ? firebaseUser.getEmail().split("@")[0] : "User");
+
         User newUser = new User(
                 userId,
-                firebaseUser.getDisplayName(),
+                displayName,
                 firebaseUser.getEmail(),
                 firebaseUser.getPhoneNumber()
         );
 
         dbManager.createUser(newUser, task -> {
             if (task.isSuccessful()) {
-                Log.d(TAG, "User created successfully");
-                checkAndCreateUserAvatar(userId, newUser.getName());
+                Log.d(TAG, "User created successfully in database");
+                updateUserDisplayName(firebaseUser, displayName);
+                createAndSaveUserAvatar(userId, displayName);
                 ((MainActivity) requireActivity()).navigateToProfile();
             } else {
-                Log.e(TAG, "Failed to create user", task.getException());
+                Log.e(TAG, "Failed to create user in database", task.getException());
                 Toast.makeText(requireContext(), "Failed to create user", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void createAndSaveUserAvatar(String userId, String displayName) {
+        String initials = AvatarUtils.getInitials(displayName);
+        int color = AvatarUtils.getRandomColor();
+        AvatarUtils.saveAvatarData(userId, initials, color);
+    }
+
+    private void updateUserDisplayName(FirebaseUser firebaseUser, String displayName) {
+        UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
+                .setDisplayName(displayName)
+                .build();
+
+        firebaseUser.updateProfile(profileUpdates)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        Log.d(TAG, "User display name updated.");
+                    } else {
+                        Log.e(TAG, "Failed to update user display name", task.getException());
+                    }
+                });
     }
 
     private void handleSignInError(IdpResponse response) {

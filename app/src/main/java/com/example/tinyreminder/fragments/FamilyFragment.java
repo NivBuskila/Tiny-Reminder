@@ -10,6 +10,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -38,6 +39,8 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     private TextView noMembersTextView;
     private FloatingActionButton addMemberButton;
     private FloatingActionButton removeMemberButton;
+    private boolean isCurrentUserAdmin = false;
+    private String currentFamilyId;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -45,6 +48,8 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         View view = inflater.inflate(R.layout.fragment_family, container, false);
         familyMembersList = view.findViewById(R.id.family_members_list);
         noMembersTextView = view.findViewById(R.id.no_members_text);
+        addMemberButton = view.findViewById(R.id.add_family_member_button);
+        removeMemberButton = view.findViewById(R.id.remove_family_member_button);
         return view;
     }
 
@@ -65,21 +70,8 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void setupButtons() {
-        addMemberButton = requireView().findViewById(R.id.add_family_member_button);
-        removeMemberButton = requireView().findViewById(R.id.remove_family_member_button);
-
         addMemberButton.setOnClickListener(v -> showAddMemberDialog());
         removeMemberButton.setOnClickListener(v -> showRemoveMemberDialog());
-    }
-
-    private void showAddMemberDialog() {
-        // TODO: Implement the logic to add a new family member
-        Toast.makeText(getContext(), "Add member functionality to be implemented", Toast.LENGTH_SHORT).show();
-    }
-
-    private void showRemoveMemberDialog() {
-        // TODO: Implement the logic to remove a family member
-        Toast.makeText(getContext(), "Remove member functionality to be implemented", Toast.LENGTH_SHORT).show();
     }
 
     private void loadFamilyMembers() {
@@ -91,7 +83,9 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
                 if (user != null && user.getFamilyId() != null) {
-                    fetchFamilyMembers(user.getFamilyId());
+                    currentFamilyId = user.getFamilyId();
+                    fetchFamilyMembers(currentFamilyId);
+                    checkAdminStatus(currentUser.getUid(), currentFamilyId);
                 } else {
                     showNoMembersMessage();
                 }
@@ -132,9 +126,21 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
                 if (user != null) {
-                    FamilyMember member = new FamilyMember(user.getId(), user.getName(), "Member");
-                    members.add(member);
-                    updateUI(members);
+                    dbManager.checkIfUserIsAdmin(user.getId(), currentFamilyId, new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot adminSnapshot) {
+                            boolean isAdmin = adminSnapshot.exists() && adminSnapshot.getValue(Boolean.class);
+                            String role = isAdmin ? "Manager" : "Member";
+                            FamilyMember member = new FamilyMember(user.getId(), user.getName(), role);
+                            members.add(member);
+                            updateUI(members);
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError databaseError) {
+                            Log.w(TAG, "checkIfUserIsAdmin:onCancelled", databaseError.toException());
+                        }
+                    });
                 }
             }
 
@@ -153,6 +159,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             familyMembersList.setVisibility(View.VISIBLE);
             noMembersTextView.setVisibility(View.GONE);
         }
+        updateUIForAdminStatus();
     }
 
     private void showNoMembersMessage() {
@@ -160,9 +167,118 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         noMembersTextView.setVisibility(View.VISIBLE);
     }
 
+    private void checkAdminStatus(String userId, String familyId) {
+        dbManager.checkIfUserIsAdmin(userId, familyId, new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                isCurrentUserAdmin = dataSnapshot.exists() && dataSnapshot.getValue(Boolean.class);
+                updateUIForAdminStatus();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.w(TAG, "checkAdminStatus:onCancelled", databaseError.toException());
+            }
+        });
+    }
+
+    private void updateUIForAdminStatus() {
+        if (isCurrentUserAdmin) {
+            addMemberButton.setVisibility(View.VISIBLE);
+            removeMemberButton.setVisibility(View.VISIBLE);
+        } else {
+            addMemberButton.setVisibility(View.GONE);
+            removeMemberButton.setVisibility(View.GONE);
+        }
+    }
+
+    private void showAddMemberDialog() {
+        // TODO: Implement the logic to add a new family member
+        Toast.makeText(getContext(), "Add member functionality to be implemented", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showRemoveMemberDialog() {
+        // TODO: Implement the logic to remove a family member
+        Toast.makeText(getContext(), "Remove member functionality to be implemented", Toast.LENGTH_SHORT).show();
+    }
+
     @Override
     public void onMemberClick(FamilyMember member) {
-        // TODO: Implement navigation to MapFragment or member details
-        Toast.makeText(getContext(), "Clicked on " + member.getName(), Toast.LENGTH_SHORT).show();
+        showMemberOptionsDialog(member);
+    }
+
+    private void showMemberOptionsDialog(FamilyMember member) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle(member.getName());
+
+        List<String> options = new ArrayList<>();
+        options.add("View Location");
+
+        if (isCurrentUserAdmin) {
+            options.add("Make Admin");
+            options.add("Remove Admin");
+            options.add("Remove from Family");
+        }
+
+        String[] optionsArray = options.toArray(new String[0]);
+
+        builder.setItems(optionsArray, (dialog, which) -> {
+            switch (optionsArray[which]) {
+                case "View Location":
+                    navigateToMapFragment(member);
+                    break;
+                case "Make Admin":
+                    makeAdmin(member);
+                    break;
+                case "Remove Admin":
+                    removeAdmin(member);
+                    break;
+                case "Remove from Family":
+                    removeFromFamily(member);
+                    break;
+            }
+        });
+        builder.show();
+    }
+
+    private void navigateToMapFragment(FamilyMember member) {
+        // TODO: Implement navigation to MapFragment
+        Toast.makeText(getContext(), "Navigating to map for " + member.getName(), Toast.LENGTH_SHORT).show();
+    }
+
+    private void makeAdmin(FamilyMember member) {
+        if (currentFamilyId == null) return;
+        dbManager.addAdminToFamily(member.getId(), currentFamilyId, task -> {
+            if (task.isSuccessful()) {
+                Toast.makeText(getContext(), member.getName() + " is now an admin", Toast.LENGTH_SHORT).show();
+                loadFamilyMembers(); // Reload to reflect changes
+            } else {
+                Toast.makeText(getContext(), "Failed to make " + member.getName() + " an admin", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void removeAdmin(FamilyMember member) {
+        if (currentFamilyId == null) return;
+        dbManager.removeAdminFromFamily(member.getId(), currentFamilyId, task -> {
+            if (task.isSuccessful()) {
+                Toast.makeText(getContext(), member.getName() + " is no longer an admin", Toast.LENGTH_SHORT).show();
+                loadFamilyMembers(); // Reload to reflect changes
+            } else {
+                Toast.makeText(getContext(), "Failed to remove " + member.getName() + " as an admin", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void removeFromFamily(FamilyMember member) {
+        if (currentFamilyId == null) return;
+        dbManager.removeUserFromFamily(member.getId(), currentFamilyId, task -> {
+            if (task.isSuccessful()) {
+                Toast.makeText(getContext(), member.getName() + " has been removed from the family", Toast.LENGTH_SHORT).show();
+                loadFamilyMembers(); // Reload to reflect changes
+            } else {
+                Toast.makeText(getContext(), "Failed to remove " + member.getName() + " from the family", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 }

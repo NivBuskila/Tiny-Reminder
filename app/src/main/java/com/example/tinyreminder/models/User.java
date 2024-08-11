@@ -11,6 +11,7 @@ public class User {
     private String phoneNumber;
     private String avatarUrl;
     private String familyId;
+    private Map<String, Object> avatar;
 
     // Default constructor required for calls to DataSnapshot.getValue(User.class)
     public User() {}
@@ -68,6 +69,14 @@ public class User {
 
     public String getAvatarUrl() {
         return avatarUrl;
+    }
+
+    public Map<String, Object> getAvatar() {
+        return avatar;
+    }
+
+    public void setAvatar(Map<String, Object> avatar) {
+        this.avatar = avatar;
     }
 
     public void setAvatarUrl(String avatarUrl) {

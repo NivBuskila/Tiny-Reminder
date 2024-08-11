@@ -22,6 +22,9 @@ public class AvatarUtils {
     private static final String TAG = "AvatarUtils";
 
     public static String getInitials(@NonNull String fullName) {
+        if (fullName == null || fullName.trim().isEmpty()) {
+            return ""; // default value
+        }
         String[] names = fullName.split(" ");
         StringBuilder initials = new StringBuilder();
         for (String name : names) {
@@ -84,8 +87,6 @@ public class AvatarUtils {
             return;
         }
 
-        Log.d(TAG, "Loading avatar data for user: " + userId);
-
         DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(userId);
         userRef.child("avatar").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -93,15 +94,12 @@ public class AvatarUtils {
                 if (dataSnapshot.exists()) {
                     String initials = dataSnapshot.child("initials").getValue(String.class);
                     Integer color = dataSnapshot.child("color").getValue(Integer.class);
-                    Log.d(TAG, "Avatar data loaded: initials = " + initials + ", color = " + color);
                     if (initials != null && color != null) {
                         listener.onAvatarDataLoaded(initials, color);
                     } else {
-                        Log.d(TAG, "Avatar data incomplete, creating new avatar");
                         createAndSaveNewAvatar(userId, name, listener);
                     }
                 } else {
-                    Log.d(TAG, "No avatar data found, creating new avatar");
                     createAndSaveNewAvatar(userId, name, listener);
                 }
             }
@@ -114,9 +112,10 @@ public class AvatarUtils {
         });
     }
     private static void createAndSaveNewAvatar(String userId, String name, OnAvatarDataLoadedListener listener) {
-        String newInitials = getInitials(name);
+        String newInitials = name != null ? getInitials(name) : "";
         int newColor = getRandomColor();
         saveAvatarData(userId, newInitials, newColor);
         listener.onAvatarDataLoaded(newInitials, newColor);
     }
+
 }

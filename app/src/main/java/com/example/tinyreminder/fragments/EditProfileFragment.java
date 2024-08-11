@@ -1,7 +1,5 @@
 package com.example.tinyreminder.fragments;
 
-import static android.content.ContentValues.TAG;
-
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -31,6 +29,8 @@ import de.hdodenhof.circleimageview.CircleImageView;
 
 public class EditProfileFragment extends Fragment {
 
+    private static final String TAG = "EditProfileFragment";
+
     private CircleImageView editProfileImage;
     private MaterialButton changePhotoButton;
     private TextInputEditText editName;
@@ -39,6 +39,7 @@ public class EditProfileFragment extends Fragment {
     private MaterialButton saveProfileButton;
     private DatabaseManager dbManager;
     private String originalName;
+    private String userId;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -68,7 +69,8 @@ public class EditProfileFragment extends Fragment {
     private void initViews() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user != null) {
-            loadUserData(user.getUid());
+            userId = user.getUid();
+            loadUserData(userId);
         }
     }
 
@@ -83,6 +85,7 @@ public class EditProfileFragment extends Fragment {
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
                 if (user != null) {
+                    user.setId(uid); // Set the ID here
                     updateUI(user);
                     originalName = user.getName();
                 } else {
@@ -99,14 +102,14 @@ public class EditProfileFragment extends Fragment {
     }
 
     private void updateUI(User user) {
-        loadAndDisplayAvatar(user.getId());
+        loadAndDisplayAvatar(user.getId(), user.getName());
         editName.setText(user.getName());
         editEmail.setText(user.getEmail());
         editPhone.setText(user.getPhoneNumber());
     }
 
-    private void loadAndDisplayAvatar(String uid) {
-        AvatarUtils.loadAvatarData(uid, editName.getText().toString(), (initials, color) -> {
+    private void loadAndDisplayAvatar(String uid, String name) {
+        AvatarUtils.loadAvatarData(uid, name, (initials, color) -> {
             if (initials != null && color != 0) {
                 editProfileImage.setImageBitmap(AvatarUtils.createAvatarBitmap(initials, color, 200));
             }
@@ -146,21 +149,30 @@ public class EditProfileFragment extends Fragment {
     }
 
     private void updateEmailAndPhone(FirebaseUser user, String newName, String newEmail, String newPhone) {
-        user.updateEmail(newEmail)
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        saveUserToDatabase(user.getUid(), newName, newEmail, newPhone);
-                    } else {
-                        Toast.makeText(getContext(), "Failed to update email", Toast.LENGTH_SHORT).show();
-                    }
-                });
+        if (newEmail == null || newEmail.trim().isEmpty()) {
+            saveUserToDatabase(user.getUid(), newName, user.getEmail(), newPhone);
+        } else {
+            user.updateEmail(newEmail)
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful()) {
+                            saveUserToDatabase(user.getUid(), newName, newEmail, newPhone);
+                        } else {
+                            Toast.makeText(getContext(), "Failed to update email: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+        }
     }
 
     private void saveUserToDatabase(String uid, String name, String email, String phone) {
         Map<String, Object> userUpdates = new HashMap<>();
+        userUpdates.put("id", uid); // Add this line
         userUpdates.put("name", name);
-        userUpdates.put("email", email);
-        userUpdates.put("phoneNumber", phone);
+        if (email != null && !email.trim().isEmpty()) {
+            userUpdates.put("email", email);
+        }
+        if (phone != null && !phone.trim().isEmpty()) {
+            userUpdates.put("phoneNumber", phone);
+        }
 
         dbManager.updateUserProfile(uid, userUpdates, task -> {
             if (task.isSuccessful()) {

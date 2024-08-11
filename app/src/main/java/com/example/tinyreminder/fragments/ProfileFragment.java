@@ -90,7 +90,8 @@ public class ProfileFragment extends Fragment {
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     User user = snapshot.getValue(User.class);
                     if (user != null) {
-                        Log.d(TAG, "User data loaded successfully");
+                        user.setId(userId); // Ensure the ID is set
+                        Log.d(TAG, "User data loaded successfully: " + user.toString());
                         updateUIWithUserData(user);
                         if (user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
                             loadFamilyData(user.getFamilyId());
@@ -99,17 +100,39 @@ public class ProfileFragment extends Fragment {
                         }
                     } else {
                         Log.e(TAG, "User data is null");
+                        // If user data is null, we might want to create it
+                        createUserDataIfNotExists(currentUser);
                     }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
                     Log.e(TAG, "Failed to load user data: " + error.getMessage());
+                    Toast.makeText(getContext(), "Failed to load user data", Toast.LENGTH_SHORT).show();
                 }
             });
         } else {
             Log.e(TAG, "Current user is null");
+            Toast.makeText(getContext(), "No user logged in", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void createUserDataIfNotExists(FirebaseUser firebaseUser) {
+        User newUser = new User(
+                firebaseUser.getUid(),
+                firebaseUser.getDisplayName(),
+                firebaseUser.getEmail(),
+                firebaseUser.getPhoneNumber()
+        );
+        dbManager.createUser(newUser, task -> {
+            if (task.isSuccessful()) {
+                Log.d(TAG, "User data created successfully");
+                updateUIWithUserData(newUser);
+            } else {
+                Log.e(TAG, "Failed to create user data", task.getException());
+                Toast.makeText(getContext(), "Failed to create user data", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void loadFamilyData(String familyId) {
@@ -146,11 +169,11 @@ public class ProfileFragment extends Fragment {
             return;
         }
 
-        Log.d(TAG, "Updating UI with user data: " + user.getId());
+        Log.d(TAG, "Updating UI with user data: " + user.toString());
 
-        profileName.setText(user.getName());
-        profileEmail.setText(user.getEmail());
-        profilePhone.setText(user.getPhoneNumber());
+        profileName.setText(user.getName() != null ? user.getName() : "N/A");
+        profileEmail.setText(user.getEmail() != null ? user.getEmail() : "N/A");
+        profilePhone.setText(user.getPhoneNumber() != null ? user.getPhoneNumber() : "N/A");
 
         String userId = user.getId();
         if (userId == null || userId.isEmpty()) {
@@ -162,9 +185,14 @@ public class ProfileFragment extends Fragment {
     }
 
     private void loadAndDisplayAvatar(String userId, String name) {
+        Log.d(TAG, "Loading avatar for user: " + userId + ", name: " + name);
         AvatarUtils.loadAvatarData(userId, name, (initials, color) -> {
             if (initials != null && color != 0) {
+                Log.d(TAG, "Avatar loaded successfully. Initials: " + initials + ", Color: " + color);
                 profileImage.setImageBitmap(AvatarUtils.createAvatarBitmap(initials, color, 200));
+            } else {
+                Log.e(TAG, "Failed to load avatar data");
+                profileImage.setImageResource(R.drawable.default_avatar);
             }
         });
     }
@@ -209,15 +237,15 @@ public class ProfileFragment extends Fragment {
         builder.setPositiveButton("Create", (dialog, which) -> {
             String familyName = input.getText().toString().trim();
             if (!familyName.isEmpty()) {
-                String familyId = dbManager.createNewFamily(familyName);
                 FirebaseUser currentUser = mAuth.getCurrentUser();
                 if (currentUser != null) {
-                    dbManager.addUserToFamily(currentUser.getUid(), familyId, task -> {
+                    dbManager.createNewFamily(familyName, currentUser.getUid(), task -> {
                         if (task.isSuccessful()) {
+                            String familyId = task.getResult();
                             Toast.makeText(getContext(), "Family created successfully", Toast.LENGTH_SHORT).show();
                             loadUserData();
                         } else {
-                            Toast.makeText(getContext(), "Failed to create family", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "Failed to create family: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
                         }
                     });
                 }
@@ -251,12 +279,28 @@ public class ProfileFragment extends Fragment {
     private void joinFamily(String familyId) {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
-            dbManager.addUserToFamily(currentUser.getUid(), familyId, task -> {
-                if (task.isSuccessful()) {
-                    Toast.makeText(getContext(), "Joined family successfully", Toast.LENGTH_SHORT).show();
-                    loadUserData();
-                } else {
-                    Toast.makeText(getContext(), "Failed to join family", Toast.LENGTH_SHORT).show();
+            dbManager.checkFamilyExists(familyId, new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    if (dataSnapshot.exists()) {
+                        // Family exists, proceed with joining
+                        dbManager.addUserToFamily(currentUser.getUid(), familyId, task -> {
+                            if (task.isSuccessful()) {
+                                Toast.makeText(getContext(), "Joined family successfully", Toast.LENGTH_SHORT).show();
+                                loadUserData();
+                            } else {
+                                Toast.makeText(getContext(), "Failed to join family", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    } else {
+                        // Family does not exist
+                        Toast.makeText(getContext(), "Family does not exist", Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
+                    Toast.makeText(getContext(), "Error checking family: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             });
         }
