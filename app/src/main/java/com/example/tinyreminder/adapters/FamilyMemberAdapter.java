@@ -10,6 +10,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
 import com.example.tinyreminder.R;
 import com.example.tinyreminder.models.FamilyMember;
 import com.example.tinyreminder.utils.AvatarUtils;
@@ -68,14 +69,22 @@ public class FamilyMemberAdapter extends RecyclerView.Adapter<FamilyMemberAdapte
             nameTextView.setText(member.getName());
             roleTextView.setText(member.getRole());
 
-            AvatarUtils.loadAvatarData(member.getId(), member.getName(), (initials, color) -> {
-                if (initials != null && color != 0) {
-                    Bitmap avatarBitmap = AvatarUtils.createAvatarBitmap(initials, color, 200);
-                    avatarImageView.setImageBitmap(avatarBitmap);
-                } else {
-                    avatarImageView.setImageResource(R.drawable.default_avatar);
-                }
-            });
+            // Load profile picture or avatar
+            if (member.getProfilePictureUrl() != null && !member.getProfilePictureUrl().isEmpty()) {
+                Glide.with(itemView.getContext())
+                        .load(member.getProfilePictureUrl())
+                        .circleCrop()
+                        .into(avatarImageView);
+            } else {
+                AvatarUtils.loadAvatarData(member.getId(), member.getName(), (initials, color) -> {
+                    if (initials != null && color != 0) {
+                        Bitmap avatarBitmap = AvatarUtils.createAvatarBitmap(initials, color, 200);
+                        avatarImageView.setImageBitmap(avatarBitmap);
+                    } else {
+                        avatarImageView.setImageResource(R.drawable.default_avatar);
+                    }
+                });
+            }
 
             switch (member.getResponseStatus()) {
                 case OK:

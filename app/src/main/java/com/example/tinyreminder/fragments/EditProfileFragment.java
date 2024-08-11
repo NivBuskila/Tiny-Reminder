@@ -1,14 +1,21 @@
 package com.example.tinyreminder.fragments;
 
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import com.bumptech.glide.Glide;
 import com.example.tinyreminder.R;
 import com.example.tinyreminder.models.User;
 import com.example.tinyreminder.utils.AvatarUtils;
@@ -30,6 +37,7 @@ import de.hdodenhof.circleimageview.CircleImageView;
 public class EditProfileFragment extends Fragment {
 
     private static final String TAG = "EditProfileFragment";
+    private static final int PICK_IMAGE_REQUEST = 1;
 
     private CircleImageView editProfileImage;
     private MaterialButton changePhotoButton;
@@ -40,6 +48,7 @@ public class EditProfileFragment extends Fragment {
     private DatabaseManager dbManager;
     private String originalName;
     private String userId;
+    private Uri imageUri;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -85,7 +94,7 @@ public class EditProfileFragment extends Fragment {
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
                 if (user != null) {
-                    user.setId(uid); // Set the ID here
+                    user.setId(uid);
                     updateUI(user);
                     originalName = user.getName();
                 } else {
@@ -102,28 +111,44 @@ public class EditProfileFragment extends Fragment {
     }
 
     private void updateUI(User user) {
-        loadAndDisplayAvatar(user.getId(), user.getName());
+        loadAndDisplayAvatar(user.getId(), user.getName(), user.getProfilePictureUrl());
         editName.setText(user.getName());
         editEmail.setText(user.getEmail());
         editPhone.setText(user.getPhoneNumber());
     }
 
-    private void loadAndDisplayAvatar(String uid, String name) {
-        AvatarUtils.loadAvatarData(uid, name, (initials, color) -> {
-            if (initials != null && color != 0) {
-                editProfileImage.setImageBitmap(AvatarUtils.createAvatarBitmap(initials, color, 200));
-            }
-        });
+    private void loadAndDisplayAvatar(String uid, String name, String profilePictureUrl) {
+        if (profilePictureUrl != null && !profilePictureUrl.isEmpty()) {
+            Glide.with(this)
+                    .load(profilePictureUrl)
+                    .circleCrop()
+                    .into(editProfileImage);
+        } else {
+            AvatarUtils.loadAvatarData(uid, name, (initials, color) -> {
+                if (initials != null && color != 0) {
+                    editProfileImage.setImageBitmap(AvatarUtils.createAvatarBitmap(initials, color, 200));
+                }
+            });
+        }
     }
 
     private void setupButtons() {
-        changePhotoButton.setOnClickListener(v -> changePhoto());
+        changePhotoButton.setOnClickListener(v -> openImagePicker());
         saveProfileButton.setOnClickListener(v -> saveProfileChanges());
     }
 
-    private void changePhoto() {
-        // TODO: Implement photo change functionality
-        Toast.makeText(getContext(), "Photo change functionality not implemented yet", Toast.LENGTH_SHORT).show();
+    private void openImagePicker() {
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(intent, PICK_IMAGE_REQUEST);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_IMAGE_REQUEST && resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
+            imageUri = data.getData();
+            Glide.with(this).load(imageUri).circleCrop().into(editProfileImage);
+        }
     }
 
     private void saveProfileChanges() {
@@ -165,7 +190,7 @@ public class EditProfileFragment extends Fragment {
 
     private void saveUserToDatabase(String uid, String name, String email, String phone) {
         Map<String, Object> userUpdates = new HashMap<>();
-        userUpdates.put("id", uid); // Add this line
+        userUpdates.put("id", uid);
         userUpdates.put("name", name);
         if (email != null && !email.trim().isEmpty()) {
             userUpdates.put("email", email);
@@ -174,11 +199,32 @@ public class EditProfileFragment extends Fragment {
             userUpdates.put("phoneNumber", phone);
         }
 
+        if (imageUri != null) {
+            uploadProfilePicture(uid, userUpdates);
+        } else {
+            updateUserProfile(uid, userUpdates);
+        }
+    }
+
+    private void uploadProfilePicture(String uid, Map<String, Object> userUpdates) {
+        dbManager.uploadProfilePicture(uid, imageUri, task -> {
+            if (task.isSuccessful()) {
+                Uri downloadUri = task.getResult();
+                userUpdates.put("profilePictureUrl", downloadUri.toString());
+                updateUserProfile(uid, userUpdates);
+            } else {
+                Toast.makeText(getContext(), "Failed to upload profile picture", Toast.LENGTH_SHORT).show();
+                updateUserProfile(uid, userUpdates);
+            }
+        });
+    }
+
+    private void updateUserProfile(String uid, Map<String, Object> userUpdates) {
         dbManager.updateUserProfile(uid, userUpdates, task -> {
             if (task.isSuccessful()) {
                 Toast.makeText(getContext(), "Profile updated successfully", Toast.LENGTH_SHORT).show();
-                if (!name.equals(originalName)) {
-                    updateAvatarIfNameChanged(uid, name);
+                if (!userUpdates.get("name").equals(originalName)) {
+                    updateAvatarIfNameChanged(uid, (String) userUpdates.get("name"));
                 }
                 getParentFragmentManager().popBackStack();
             } else {

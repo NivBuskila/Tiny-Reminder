@@ -11,7 +11,10 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-
+import android.net.Uri;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,6 +33,19 @@ public class DatabaseManager {
     public void updateUserProfile(String userId, Map<String, Object> updates, final OnCompleteListener<Void> listener) {
         mDatabase.child("users").child(userId).updateChildren(updates)
                 .addOnCompleteListener(listener);
+    }
+
+    public void uploadProfilePicture(String userId, Uri imageUri, OnCompleteListener<Uri> listener) {
+        StorageReference storageRef = FirebaseStorage.getInstance().getReference();
+        StorageReference profilePicRef = storageRef.child("profile_pictures/" + userId + ".jpg");
+
+        UploadTask uploadTask = profilePicRef.putFile(imageUri);
+        uploadTask.continueWithTask(task -> {
+            if (!task.isSuccessful()) {
+                throw task.getException();
+            }
+            return profilePicRef.getDownloadUrl();
+        }).addOnCompleteListener(listener);
     }
 
     public void createNewFamily(String familyName, String creatorId, OnCompleteListener<String> listener) {

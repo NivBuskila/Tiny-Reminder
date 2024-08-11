@@ -16,6 +16,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
+import com.bumptech.glide.Glide;
 import com.example.tinyreminder.MainActivity;
 import com.example.tinyreminder.R;
 import com.example.tinyreminder.models.Family;
@@ -52,6 +53,11 @@ public class ProfileFragment extends Fragment {
         super.onCreate(savedInstanceState);
         dbManager = new DatabaseManager();
         mAuth = FirebaseAuth.getInstance();
+    }
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadUserData();
     }
 
     @Override
@@ -183,7 +189,14 @@ public class ProfileFragment extends Fragment {
             return;
         }
 
-        loadAndDisplayAvatar(userId, user.getName());
+        if (user.getProfilePictureUrl() != null && !user.getProfilePictureUrl().isEmpty()) {
+            Glide.with(this)
+                    .load(user.getProfilePictureUrl())
+                    .circleCrop()
+                    .into(profileImage);
+        } else {
+            loadAndDisplayAvatar(userId, user.getName());
+        }
         updatePhoneNumberRelatedUI(user.hasPhoneNumber());
     }
 

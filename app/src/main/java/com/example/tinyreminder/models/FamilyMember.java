@@ -5,6 +5,7 @@ public class FamilyMember {
     private String name;
     private String role;
     private ResponseStatus responseStatus;
+    private String profilePictureUrl;
 
     public enum ResponseStatus {
         OK,      // GREEN - Answered / no alert sent
@@ -28,6 +29,15 @@ public class FamilyMember {
     public String getId() {
         return id;
     }
+
+    public String getProfilePictureUrl() {
+        return profilePictureUrl;
+    }
+
+    public void setProfilePictureUrl(String profilePictureUrl) {
+        this.profilePictureUrl = profilePictureUrl;
+    }
+
 
     public void setId(String id) {
         this.id = id;

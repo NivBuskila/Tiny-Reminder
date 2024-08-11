@@ -120,6 +120,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         });
     }
 
+
     private void fetchMemberDetails(String memberId, final List<FamilyMember> members) {
         dbManager.getMemberData(memberId, new ValueEventListener() {
             @Override
@@ -132,6 +133,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                             boolean isAdmin = adminSnapshot.exists() && adminSnapshot.getValue(Boolean.class);
                             String role = isAdmin ? "Manager" : "Member";
                             FamilyMember member = new FamilyMember(user.getId(), user.getName(), role);
+                            member.setProfilePictureUrl(user.getProfilePictureUrl());  // Add this line
                             members.add(member);
                             updateUI(members);
                         }
