@@ -38,6 +38,7 @@ public class ProfileFragment extends Fragment {
     private Button editProfileButton, familyButton, createJoinFamilyButton, logoutButton;
     private DatabaseManager dbManager;
     private FirebaseAuth mAuth;
+    private User currentUser;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -81,16 +82,17 @@ public class ProfileFragment extends Fragment {
     }
 
     private void loadUserData() {
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser != null) {
-            String userId = currentUser.getUid();
+        FirebaseUser firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (firebaseUser != null) {
+            String userId = firebaseUser.getUid();
             Log.d(TAG, "Loading user data for userId: " + userId);
             dbManager.getUserData(userId, new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     User user = snapshot.getValue(User.class);
                     if (user != null) {
-                        user.setId(userId); // Ensure the ID is set
+                        user.setId(userId);
+                        currentUser = user;
                         Log.d(TAG, "User data loaded successfully: " + user.toString());
                         updateUIWithUserData(user);
                         if (user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
@@ -100,8 +102,7 @@ public class ProfileFragment extends Fragment {
                         }
                     } else {
                         Log.e(TAG, "User data is null");
-                        // If user data is null, we might want to create it
-                        createUserDataIfNotExists(currentUser);
+                        createUserDataIfNotExists(firebaseUser);
                     }
                 }
 
@@ -127,6 +128,7 @@ public class ProfileFragment extends Fragment {
         dbManager.createUser(newUser, task -> {
             if (task.isSuccessful()) {
                 Log.d(TAG, "User data created successfully");
+                currentUser = newUser;
                 updateUIWithUserData(newUser);
             } else {
                 Log.e(TAG, "Failed to create user data", task.getException());
@@ -182,6 +184,7 @@ public class ProfileFragment extends Fragment {
         }
 
         loadAndDisplayAvatar(userId, user.getName());
+        updatePhoneNumberRelatedUI(user.hasPhoneNumber());
     }
 
     private void loadAndDisplayAvatar(String userId, String name) {
@@ -218,73 +221,94 @@ public class ProfileFragment extends Fragment {
     }
 
     private void showFamilySelectionDialog() {
+        if (currentUser != null && currentUser.hasPhoneNumber()) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+            builder.setTitle("Family Selection")
+                    .setMessage("Do you want to create a new family or join an existing one?")
+                    .setPositiveButton("Create New", (dialog, which) -> createNewFamily())
+                    .setNegativeButton("Join Existing", (dialog, which) -> showJoinFamilyDialog())
+                    .setCancelable(false)
+                    .show();
+        } else {
+            showPhoneNumberRequiredDialog();
+        }
+    }
+
+    private void showPhoneNumberRequiredDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Family Selection")
-                .setMessage("Do you want to create a new family or join an existing one?")
-                .setPositiveButton("Create New", (dialog, which) -> createNewFamily())
-                .setNegativeButton("Join Existing", (dialog, which) -> showJoinFamilyDialog())
-                .setCancelable(false)
+        builder.setTitle("Phone Number Required")
+                .setMessage("You need to add a phone number to your profile before creating or joining a family.")
+                .setPositiveButton("Add Phone Number", (dialog, which) -> navigateToEditProfile())
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                 .show();
     }
 
     private void createNewFamily() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Create New Family");
-        final EditText input = new EditText(getContext());
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        input.setHint("Enter family name");
-        builder.setView(input);
-        builder.setPositiveButton("Create", (dialog, which) -> {
-            String familyName = input.getText().toString().trim();
-            if (!familyName.isEmpty()) {
-                FirebaseUser currentUser = mAuth.getCurrentUser();
-                if (currentUser != null) {
-                    dbManager.createNewFamily(familyName, currentUser.getUid(), task -> {
-                        if (task.isSuccessful()) {
-                            String familyId = task.getResult();
-                            Toast.makeText(getContext(), "Family created successfully", Toast.LENGTH_SHORT).show();
-                            loadUserData();
-                        } else {
-                            Toast.makeText(getContext(), "Failed to create family: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                    });
+        if (currentUser != null && currentUser.hasPhoneNumber()) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+            builder.setTitle("Create New Family");
+            final EditText input = new EditText(getContext());
+            input.setInputType(InputType.TYPE_CLASS_TEXT);
+            input.setHint("Enter family name");
+            builder.setView(input);
+            builder.setPositiveButton("Create", (dialog, which) -> {
+                String familyName = input.getText().toString().trim();
+                if (!familyName.isEmpty()) {
+                    FirebaseUser currentFirebaseUser = mAuth.getCurrentUser();
+                    if (currentFirebaseUser != null) {
+                        dbManager.createNewFamily(familyName, currentFirebaseUser.getUid(), task -> {
+                            if (task.isSuccessful()) {
+                                String familyId = task.getResult();
+                                Toast.makeText(getContext(), "Family created successfully", Toast.LENGTH_SHORT).show();
+                                loadUserData();
+                            } else {
+                                Toast.makeText(getContext(), "Failed to create family: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+                } else {
+                    Toast.makeText(getContext(), "Family name cannot be empty", Toast.LENGTH_SHORT).show();
                 }
-            } else {
-                Toast.makeText(getContext(), "Family name cannot be empty", Toast.LENGTH_SHORT).show();
-            }
-        });
-        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
-        builder.show();
+            });
+            builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+            builder.show();
+        } else {
+            showPhoneNumberRequiredDialog();
+        }
     }
 
     private void showJoinFamilyDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Join Family");
-        final EditText input = new EditText(getContext());
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        input.setHint("Enter family code");
-        builder.setView(input);
-        builder.setPositiveButton("Join", (dialog, which) -> {
-            String familyId = input.getText().toString().trim();
-            if (!familyId.isEmpty()) {
-                joinFamily(familyId);
-            } else {
-                Toast.makeText(getContext(), "Family code cannot be empty", Toast.LENGTH_SHORT).show();
-            }
-        });
-        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
-        builder.show();
+        if (currentUser != null && currentUser.hasPhoneNumber()) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+            builder.setTitle("Join Family");
+            final EditText input = new EditText(getContext());
+            input.setInputType(InputType.TYPE_CLASS_TEXT);
+            input.setHint("Enter family code");
+            builder.setView(input);
+            builder.setPositiveButton("Join", (dialog, which) -> {
+                String familyId = input.getText().toString().trim();
+                if (!familyId.isEmpty()) {
+                    joinFamily(familyId);
+                } else {
+                    Toast.makeText(getContext(), "Family code cannot be empty", Toast.LENGTH_SHORT).show();
+                }
+            });
+            builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+            builder.show();
+        } else {
+            showPhoneNumberRequiredDialog();
+        }
     }
 
     private void joinFamily(String familyId) {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser != null) {
+        FirebaseUser currentFirebaseUser = mAuth.getCurrentUser();
+        if (currentFirebaseUser != null) {
             dbManager.checkFamilyExists(familyId, new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                     if (dataSnapshot.exists()) {
                         // Family exists, proceed with joining
-                        dbManager.addUserToFamily(currentUser.getUid(), familyId, task -> {
+                        dbManager.addUserToFamily(currentFirebaseUser.getUid(), familyId, task -> {
                             if (task.isSuccessful()) {
                                 Toast.makeText(getContext(), "Joined family successfully", Toast.LENGTH_SHORT).show();
                                 loadUserData();
@@ -303,6 +327,16 @@ public class ProfileFragment extends Fragment {
                     Toast.makeText(getContext(), "Error checking family: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+    }
+
+    private void updatePhoneNumberRelatedUI(boolean hasPhoneNumber) {
+        if (hasPhoneNumber) {
+            createJoinFamilyButton.setEnabled(true);
+            // You might want to show a message that the user can now create or join a family
+        } else {
+            createJoinFamilyButton.setEnabled(false);
+            // You might want to show a message that the user needs to add a phone number
         }
     }
 

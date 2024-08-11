@@ -34,6 +34,10 @@ public class User {
         this.familyId = familyId;
     }
 
+    public boolean hasPhoneNumber() {
+        return phoneNumber != null && !phoneNumber.isEmpty();
+    }
+
     // Getters and setters
     public String getId() {
         return id;

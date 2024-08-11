@@ -122,6 +122,10 @@ public class DatabaseManager {
                 .addListenerForSingleValueEvent(listener);
     }
 
+    public void checkUserHasPhoneNumber(String userId, final ValueEventListener listener) {
+        mDatabase.child("users").child(userId).child("phoneNumber").addListenerForSingleValueEvent(listener);
+    }
+
     public void removeUserFromFamily(String userId, String familyId, final OnCompleteListener<Void> listener) {
         Map<String, Object> updates = new HashMap<>();
         updates.put("/users/" + userId + "/familyId", null);
