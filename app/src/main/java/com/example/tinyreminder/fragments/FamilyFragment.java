@@ -1,10 +1,12 @@
 package com.example.tinyreminder.fragments;
 
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -120,7 +122,6 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         });
     }
 
-
     private void fetchMemberDetails(String memberId, final List<FamilyMember> members) {
         dbManager.getMemberData(memberId, new ValueEventListener() {
             @Override
@@ -133,7 +134,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                             boolean isAdmin = adminSnapshot.exists() && adminSnapshot.getValue(Boolean.class);
                             String role = isAdmin ? "Manager" : "Member";
                             FamilyMember member = new FamilyMember(user.getId(), user.getName(), role);
-                            member.setProfilePictureUrl(user.getProfilePictureUrl());  // Add this line
+                            member.setProfilePictureUrl(user.getProfilePictureUrl());
                             members.add(member);
                             updateUI(members);
                         }
@@ -195,13 +196,95 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void showAddMemberDialog() {
-        // TODO: Implement the logic to add a new family member
-        Toast.makeText(getContext(), "Add member functionality to be implemented", Toast.LENGTH_SHORT).show();
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Add Family Member");
+
+        final EditText input = new EditText(getContext());
+        input.setInputType(InputType.TYPE_CLASS_PHONE);
+        input.setHint("Enter phone number");
+        builder.setView(input);
+
+        builder.setPositiveButton("Add", (dialog, which) -> {
+            String phoneNumber = input.getText().toString().trim();
+            if (!phoneNumber.isEmpty()) {
+                addMemberByPhoneNumber(phoneNumber);
+            } else {
+                Toast.makeText(getContext(), "Phone number cannot be empty", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        builder.show();
+    }
+
+    private void addMemberByPhoneNumber(String phoneNumber) {
+        dbManager.getUserByPhoneNumber(phoneNumber, new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
+                        User user = userSnapshot.getValue(User.class);
+                        if (user != null) {
+                            addUserToFamily(user);
+                            return;
+                        }
+                    }
+                } else {
+                    Toast.makeText(getContext(), "User not found with this phone number", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Toast.makeText(getContext(), "Error: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void addUserToFamily(User user) {
+        if (user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
+            Toast.makeText(getContext(), "User is already in a family", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        dbManager.addUserToFamily(user.getId(), currentFamilyId, task -> {
+            if (task.isSuccessful()) {
+                Toast.makeText(getContext(), "User added to family successfully", Toast.LENGTH_SHORT).show();
+                loadFamilyMembers();
+            } else {
+                Toast.makeText(getContext(), "Failed to add user to family", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void showRemoveMemberDialog() {
-        // TODO: Implement the logic to remove a family member
-        Toast.makeText(getContext(), "Remove member functionality to be implemented", Toast.LENGTH_SHORT).show();
+        List<FamilyMember> members = adapter.getMembers();
+        if (members.isEmpty()) {
+            Toast.makeText(getContext(), "No members to remove", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] memberNames = members.stream().map(FamilyMember::getName).toArray(String[]::new);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Remove Family Member")
+                .setItems(memberNames, (dialog, which) -> {
+                    FamilyMember selectedMember = members.get(which);
+                    removeMemberFromFamily(selectedMember);
+                });
+
+        builder.show();
+    }
+
+    private void removeMemberFromFamily(FamilyMember member) {
+        dbManager.removeUserFromFamily(member.getId(), currentFamilyId, task -> {
+            if (task.isSuccessful()) {
+                Toast.makeText(getContext(), member.getName() + " removed from family", Toast.LENGTH_SHORT).show();
+                loadFamilyMembers();
+            } else {
+                Toast.makeText(getContext(), "Failed to remove " + member.getName() + " from family", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
@@ -236,7 +319,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                     removeAdmin(member);
                     break;
                 case "Remove from Family":
-                    removeFromFamily(member);
+                    removeMemberFromFamily(member);
                     break;
             }
         });
@@ -268,18 +351,6 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                 loadFamilyMembers(); // Reload to reflect changes
             } else {
                 Toast.makeText(getContext(), "Failed to remove " + member.getName() + " as an admin", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void removeFromFamily(FamilyMember member) {
-        if (currentFamilyId == null) return;
-        dbManager.removeUserFromFamily(member.getId(), currentFamilyId, task -> {
-            if (task.isSuccessful()) {
-                Toast.makeText(getContext(), member.getName() + " has been removed from the family", Toast.LENGTH_SHORT).show();
-                loadFamilyMembers(); // Reload to reflect changes
-            } else {
-                Toast.makeText(getContext(), "Failed to remove " + member.getName() + " from the family", Toast.LENGTH_SHORT).show();
             }
         });
     }

@@ -93,6 +93,10 @@ public class DatabaseManager {
         });
     }
 
+    public void getUserByPhoneNumber(String phoneNumber, final ValueEventListener listener) {
+        mDatabase.child("users").orderByChild("phoneNumber").equalTo(phoneNumber).addListenerForSingleValueEvent(listener);
+    }
+
     public void addAdminToFamily(String userId, String familyId, final OnCompleteListener<Void> listener) {
         Map<String, Object> updates = new HashMap<>();
         updates.put("/families/" + familyId + "/adminIds/" + userId, true);

@@ -15,9 +15,11 @@ import com.example.tinyreminder.R;
 import com.example.tinyreminder.models.FamilyMember;
 import com.example.tinyreminder.utils.AvatarUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class FamilyMemberAdapter extends RecyclerView.Adapter<FamilyMemberAdapter.ViewHolder> {
+
     private List<FamilyMember> members;
     private OnMemberClickListener listener;
 
@@ -49,6 +51,10 @@ public class FamilyMemberAdapter extends RecyclerView.Adapter<FamilyMemberAdapte
         members.clear();
         members.addAll(newMembers);
         notifyDataSetChanged();
+    }
+
+    public List<FamilyMember> getMembers() {
+        return new ArrayList<>(members);
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
