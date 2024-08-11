@@ -109,6 +109,9 @@ public class DatabaseManager {
                 .addOnCompleteListener(listener);
     }
 
+    public void deleteFamily(String familyId, OnCompleteListener<Void> listener) {
+        mDatabase.child("families").child(familyId).removeValue().addOnCompleteListener(listener);
+    }
     public void getUserData(String userId, final ValueEventListener listener) {
         mDatabase.child("users").child(userId).addListenerForSingleValueEvent(listener);
     }

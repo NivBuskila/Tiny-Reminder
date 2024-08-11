@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.tinyreminder.MainActivity;
 import com.example.tinyreminder.R;
 import com.example.tinyreminder.adapters.FamilyMemberAdapter;
 import com.example.tinyreminder.models.FamilyMember;
@@ -280,9 +281,41 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         dbManager.removeUserFromFamily(member.getId(), currentFamilyId, task -> {
             if (task.isSuccessful()) {
                 Toast.makeText(getContext(), member.getName() + " removed from family", Toast.LENGTH_SHORT).show();
+                checkAndDeleteEmptyFamily();
                 loadFamilyMembers();
             } else {
                 Toast.makeText(getContext(), "Failed to remove " + member.getName() + " from family", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void checkAndDeleteEmptyFamily() {
+        dbManager.getFamilyMembers(currentFamilyId, new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (!dataSnapshot.exists() || dataSnapshot.getChildrenCount() == 0) {
+                    // Family has no members, delete it
+                    dbManager.deleteFamily(currentFamilyId, task -> {
+                        if (task.isSuccessful()) {
+                            Toast.makeText(getContext(), "Family deleted as it has no members left", Toast.LENGTH_SHORT).show();
+                            navigateToProfileScreen();
+                        } else {
+                            Toast.makeText(getContext(), "Failed to delete empty family", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+            }
+
+            private void navigateToProfileScreen() {
+                // Navigate to the profile screen
+                if (getActivity() instanceof MainActivity) {
+                    ((MainActivity) getActivity()).navigateToProfile();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.w(TAG, "checkAndDeleteEmptyFamily:onCancelled", databaseError.toException());
             }
         });
     }
