@@ -23,7 +23,6 @@ import com.example.tinyreminder.adapters.FamilyMemberAdapter;
 import com.example.tinyreminder.models.FamilyMember;
 import com.example.tinyreminder.models.User;
 import com.example.tinyreminder.utils.DatabaseManager;
-import com.example.tinyreminder.utils.NotificationHelper;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -45,11 +44,9 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     private FloatingActionButton removeMemberButton;
     private boolean isCurrentUserAdmin = false;
     private String currentFamilyId;
-    private NotificationHelper notificationHelper;
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        notificationHelper = new NotificationHelper(requireContext());
     }
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -257,7 +254,6 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         dbManager.addUserToFamily(user.getId(), currentFamilyId, task -> {
             if (task.isSuccessful()) {
                 Toast.makeText(getContext(), "User added to family successfully", Toast.LENGTH_SHORT).show();
-                notificationHelper.showFamilyUpdateNotification(user.getName() + " has joined the family!");
                 loadFamilyMembers();
             } else {
                 Toast.makeText(getContext(), "Failed to add user to family", Toast.LENGTH_SHORT).show();

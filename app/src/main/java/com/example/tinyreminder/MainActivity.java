@@ -67,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startLocationService() {
         Intent serviceIntent = new Intent(this, LocationUpdateService.class);
-        ContextCompat.startForegroundService(this, serviceIntent);
+        startService(serviceIntent);
     }
 
     private void setupBackPressedCallback() {
@@ -105,13 +105,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void navigateToProfile() {
-        Log.d(TAG, "Navigating to profile");
-        ProfileFragment profileFragment = new ProfileFragment();
-        getSupportFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, profileFragment)
-                .addToBackStack(null)
-                .commit();
-        Log.d(TAG, "Profile fragment transaction committed");
+        loadFragment(new ProfileFragment());
     }
 
     @Override
