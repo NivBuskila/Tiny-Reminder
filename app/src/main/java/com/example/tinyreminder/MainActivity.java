@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startLocationService() {
         Intent serviceIntent = new Intent(this, LocationUpdateService.class);
-        startService(serviceIntent);
+        ContextCompat.startForegroundService(this, serviceIntent);
     }
 
     private void setupBackPressedCallback() {

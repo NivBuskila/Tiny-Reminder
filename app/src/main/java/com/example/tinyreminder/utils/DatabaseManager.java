@@ -1,6 +1,10 @@
 package com.example.tinyreminder.utils;
 
+import android.net.Uri;
+import android.util.Log;
+
 import androidx.annotation.NonNull;
+
 import com.example.tinyreminder.models.Family;
 import com.example.tinyreminder.models.User;
 import com.google.android.gms.maps.model.LatLng;
@@ -12,19 +16,22 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-import android.net.Uri;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class DatabaseManager {
+    private static final String TAG = "DatabaseManager";
     private DatabaseReference mDatabase;
+    private StorageReference mStorage;
 
     public DatabaseManager() {
         mDatabase = FirebaseDatabase.getInstance().getReference();
+        mStorage = FirebaseStorage.getInstance().getReference();
     }
 
     public void createUser(User user, final OnCompleteListener<Void> listener) {
@@ -38,8 +45,7 @@ public class DatabaseManager {
     }
 
     public void uploadProfilePicture(String userId, Uri imageUri, OnCompleteListener<Uri> listener) {
-        StorageReference storageRef = FirebaseStorage.getInstance().getReference();
-        StorageReference profilePicRef = storageRef.child("profile_pictures/" + userId + ".jpg");
+        StorageReference profilePicRef = mStorage.child("profile_pictures/" + userId + ".jpg");
 
         UploadTask uploadTask = profilePicRef.putFile(imageUri);
         uploadTask.continueWithTask(task -> {
@@ -73,6 +79,7 @@ public class DatabaseManager {
     public void checkFamilyExists(String familyId, final ValueEventListener listener) {
         mDatabase.child("families").child(familyId).addListenerForSingleValueEvent(listener);
     }
+
     public void addUserToFamily(String userId, String familyId, final OnCompleteListener<Void> listener) {
         mDatabase.child("families").child(familyId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -114,6 +121,7 @@ public class DatabaseManager {
     public void deleteFamily(String familyId, OnCompleteListener<Void> listener) {
         mDatabase.child("families").child(familyId).removeValue().addOnCompleteListener(listener);
     }
+
     public void getUserData(String userId, final ValueEventListener listener) {
         mDatabase.child("users").child(userId).addListenerForSingleValueEvent(listener);
     }
@@ -130,11 +138,11 @@ public class DatabaseManager {
         mDatabase.child("users").child(userId).addListenerForSingleValueEvent(listener);
     }
 
-    public void updateMemberLocation(String userId, double latitude, double longitude) {
+    public Task<Void> updateMemberLocation(String userId, double latitude, double longitude) {
         Map<String, Object> locationUpdates = new HashMap<>();
         locationUpdates.put("latitude", latitude);
         locationUpdates.put("longitude", longitude);
-        mDatabase.child("locations").child(userId).setValue(locationUpdates);
+        return mDatabase.child("locations").child(userId).setValue(locationUpdates);
     }
 
     public void createOrUpdateUser(User user, final OnCompleteListener<Void> listener) {
