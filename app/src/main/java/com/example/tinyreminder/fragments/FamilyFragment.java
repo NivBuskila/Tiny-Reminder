@@ -343,7 +343,8 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         builder.setItems(optionsArray, (dialog, which) -> {
             switch (optionsArray[which]) {
                 case "View Location":
-                    navigateToMapFragment(member);
+                    MapFragment mapFragment = MapFragment.newInstance(member.getId());
+                    ((MainActivity) requireActivity()).loadFragment(mapFragment);
                     break;
                 case "Make Admin":
                     makeAdmin(member);

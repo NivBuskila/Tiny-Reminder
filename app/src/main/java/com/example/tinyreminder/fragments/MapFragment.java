@@ -76,9 +76,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 Double lng = snapshot.child("longitude").getValue(Double.class);
                 if (lat != null && lng != null) {
                     LatLng location = new LatLng(lat, lng);
-                    map.clear();
-                    map.addMarker(new MarkerOptions().position(location).title("Family Member Location"));
-                    map.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15));
+                    updateMapWithLocation(location);
                 }
             }
 
@@ -87,5 +85,13 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 // Handle error
             }
         });
+    }
+
+    private void updateMapWithLocation(LatLng location) {
+        if (map != null) {
+            map.clear();
+            map.addMarker(new MarkerOptions().position(location).title("Family Member Location"));
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15f));
+        }
     }
 }

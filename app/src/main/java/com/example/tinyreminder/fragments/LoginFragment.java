@@ -20,6 +20,7 @@ import com.example.tinyreminder.models.User;
 import com.example.tinyreminder.utils.AvatarUtils;
 import com.example.tinyreminder.utils.DatabaseManager;
 import com.firebase.ui.auth.AuthUI;
+import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.FirebaseAuthUIActivityResultContract;
 import com.firebase.ui.auth.IdpResponse;
 import com.firebase.ui.auth.data.model.FirebaseAuthUIAuthenticationResult;
@@ -78,13 +79,21 @@ public class LoginFragment extends Fragment {
     private void onSignInResult(FirebaseAuthUIAuthenticationResult result) {
         IdpResponse response = result.getIdpResponse();
         if (result.getResultCode() == Activity.RESULT_OK) {
-            FirebaseUser firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
-            if (firebaseUser != null) {
-                String userId = firebaseUser.getUid();
-                checkExistingUser(userId, firebaseUser);
-            }
+            // Sign in success, update UI with the signed-in user's information
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            // Handle successful sign-in
         } else {
-            handleSignInError(response);
+            // Sign in failed
+            if (response == null) {
+                // User cancelled sign-in flow
+                Toast.makeText(getContext(), "Sign-in cancelled", Toast.LENGTH_SHORT).show();
+            } else if (response.getError() != null) {
+                if (response.getError().getErrorCode() == ErrorCodes.NO_NETWORK) {
+                    Toast.makeText(getContext(), "No internet connection", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(getContext(), "Sign-in error: " + response.getError().getLocalizedMessage(), Toast.LENGTH_SHORT).show();
+                }
+            }
         }
     }
 
