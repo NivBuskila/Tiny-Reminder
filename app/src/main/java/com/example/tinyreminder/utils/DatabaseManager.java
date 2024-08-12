@@ -3,6 +3,7 @@ package com.example.tinyreminder.utils;
 import androidx.annotation.NonNull;
 import com.example.tinyreminder.models.Family;
 import com.example.tinyreminder.models.User;
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
@@ -17,6 +18,7 @@ import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class DatabaseManager {
     private DatabaseReference mDatabase;
@@ -158,22 +160,43 @@ public class DatabaseManager {
         mDatabase.updateChildren(updates).addOnCompleteListener(listener);
     }
 
-    public void getLocationsForFamily(String familyId, final ValueEventListener listener) {
+    public void getLocationsForFamily(String familyId, OnCompleteListener<Map<String, LatLng>> listener) {
         mDatabase.child("families").child(familyId).child("memberIds")
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        Map<String, LatLng> familyLocations = new HashMap<>();
+                        final long memberCount = dataSnapshot.getChildrenCount();
+                        final AtomicLong completedCount = new AtomicLong(0);
+
                         for (DataSnapshot memberSnapshot : dataSnapshot.getChildren()) {
                             String memberId = memberSnapshot.getKey();
                             if (memberId != null) {
-                                mDatabase.child("locations").child(memberId).addValueEventListener(listener);
+                                mDatabase.child("locations").child(memberId).addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(@NonNull DataSnapshot locationSnapshot) {
+                                        Double lat = locationSnapshot.child("latitude").getValue(Double.class);
+                                        Double lng = locationSnapshot.child("longitude").getValue(Double.class);
+                                        if (lat != null && lng != null) {
+                                            familyLocations.put(memberId, new LatLng(lat, lng));
+                                        }
+                                        if (completedCount.incrementAndGet() == memberCount) {
+                                            listener.onComplete(Tasks.forResult(familyLocations));
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                                        listener.onComplete(Tasks.forException(databaseError.toException()));
+                                    }
+                                });
                             }
                         }
                     }
 
                     @Override
                     public void onCancelled(@NonNull DatabaseError databaseError) {
-                        listener.onCancelled(databaseError);
+                        listener.onComplete(Tasks.forException(databaseError.toException()));
                     }
                 });
     }
