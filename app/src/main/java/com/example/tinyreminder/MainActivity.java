@@ -53,7 +53,9 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        super.onRequestPermissionsResult(requestCode,
+                permissions,
+                grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationService();
@@ -103,7 +105,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void navigateToProfile() {
-        loadFragment(new ProfileFragment());
+        Log.d(TAG, "Navigating to profile");
+        ProfileFragment profileFragment = new ProfileFragment();
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, profileFragment)
+                .addToBackStack(null)
+                .commit();
+        Log.d(TAG, "Profile fragment transaction committed");
     }
 
     @Override

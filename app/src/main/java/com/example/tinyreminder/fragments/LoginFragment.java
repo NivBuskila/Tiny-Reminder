@@ -79,21 +79,14 @@ public class LoginFragment extends Fragment {
     private void onSignInResult(FirebaseAuthUIAuthenticationResult result) {
         IdpResponse response = result.getIdpResponse();
         if (result.getResultCode() == Activity.RESULT_OK) {
-            // Sign in success, update UI with the signed-in user's information
             FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            Log.d(TAG, "Sign in successful. User ID: " + user.getUid());
             // Handle successful sign-in
+            ((MainActivity) requireActivity()).navigateToProfile();
+            Log.d(TAG, "Attempted to navigate to profile");
         } else {
-            // Sign in failed
-            if (response == null) {
-                // User cancelled sign-in flow
-                Toast.makeText(getContext(), "Sign-in cancelled", Toast.LENGTH_SHORT).show();
-            } else if (response.getError() != null) {
-                if (response.getError().getErrorCode() == ErrorCodes.NO_NETWORK) {
-                    Toast.makeText(getContext(), "No internet connection", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(getContext(), "Sign-in error: " + response.getError().getLocalizedMessage(), Toast.LENGTH_SHORT).show();
-                }
-            }
+            // Handle sign-in failure
+            Log.e(TAG, "Sign in failed. Response: " + response);
         }
     }
 
