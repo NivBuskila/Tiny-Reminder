@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -15,9 +16,12 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
+import com.example.tinyreminder.fragments.FamilyFragment;
 import com.example.tinyreminder.fragments.LoginFragment;
+import com.example.tinyreminder.fragments.MapFragment;
 import com.example.tinyreminder.fragments.ProfileFragment;
 import com.example.tinyreminder.services.LocationUpdateService;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import android.Manifest;
@@ -27,6 +31,9 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private FirebaseAuth mAuth;
+    private BottomNavigationView bottomNavigationView;
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,8 +44,30 @@ public class MainActivity extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
 
+        setupBottomNavigation();
         setupBackPressedCallback();
         checkUserAuthState();
+    }
+
+    private void setupBottomNavigation() {
+        bottomNavigationView = findViewById(R.id.bottom_navigation);
+        bottomNavigationView.setOnItemSelectedListener(item -> {
+            Fragment selectedFragment = null;
+            int itemId = item.getItemId();
+
+            if (itemId == R.id.navigation_profile) {
+                selectedFragment = new ProfileFragment();
+            } else if (itemId == R.id.navigation_family) {
+                selectedFragment = new FamilyFragment();
+            } else if (itemId == R.id.navigation_map) {
+                selectedFragment = new MapFragment();
+            }
+
+            if (selectedFragment != null) {
+                loadFragment(selectedFragment);
+            }
+            return true;
+        });
     }
     private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -87,8 +116,10 @@ public class MainActivity extends AppCompatActivity {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             loadFragment(new ProfileFragment());
+            bottomNavigationView.setVisibility(View.VISIBLE);
         } else {
             loadFragment(new LoginFragment());
+            bottomNavigationView.setVisibility(View.GONE);
         }
     }
 
@@ -96,16 +127,18 @@ public class MainActivity extends AppCompatActivity {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.replace(R.id.fragment_container, fragment);
-        fragmentTransaction.addToBackStack(null);
         fragmentTransaction.commit();
     }
 
     public void navigateToLogin() {
         loadFragment(new LoginFragment());
+        bottomNavigationView.setVisibility(View.GONE);
     }
 
     public void navigateToProfile() {
         loadFragment(new ProfileFragment());
+        bottomNavigationView.setVisibility(View.VISIBLE);
+        bottomNavigationView.setSelectedItemId(R.id.navigation_profile);
     }
 
     @Override
