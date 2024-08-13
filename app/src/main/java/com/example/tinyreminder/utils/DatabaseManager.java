@@ -224,4 +224,10 @@ public class DatabaseManager {
     public void getLastCheckInTime(String userId, final ValueEventListener listener) {
         mDatabase.child("users").child(userId).child("lastCheckIn").addListenerForSingleValueEvent(listener);
     }
+
+    public void getUsersByPhoneNumber(String phoneNumber, ValueEventListener listener) {
+        DatabaseReference usersRef = FirebaseDatabase.getInstance().getReference("users");
+        usersRef.orderByChild("phoneNumber").equalTo(phoneNumber).addListenerForSingleValueEvent(listener);
+    }
+
 }

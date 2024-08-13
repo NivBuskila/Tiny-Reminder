@@ -1,14 +1,18 @@
 package com.example.tinyreminder.fragments;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.InputType;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -22,6 +26,8 @@ import com.example.tinyreminder.utils.AvatarUtils;
 import com.example.tinyreminder.utils.DatabaseManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.UserProfileChangeRequest;
@@ -165,7 +171,7 @@ public class EditProfileFragment extends Fragment {
             user.updateProfile(profileUpdates)
                     .addOnCompleteListener(task -> {
                         if (task.isSuccessful()) {
-                            updateEmailAndPhone(user, newName, newEmail, newPhone);
+                            checkPhoneNumberUniqueness(user, newName, newEmail, newPhone);
                         } else {
                             Toast.makeText(getContext(), "Failed to update profile", Toast.LENGTH_SHORT).show();
                         }
@@ -173,20 +179,49 @@ public class EditProfileFragment extends Fragment {
         }
     }
 
+    private void checkPhoneNumberUniqueness(FirebaseUser user, String newName, String newEmail, String newPhone) {
+        if (newPhone.isEmpty()) {
+            updateEmailAndPhone(user, newName, newEmail, newPhone);
+            return;
+        }
+
+        dbManager.getUsersByPhoneNumber(newPhone, new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                boolean isUnique = true;
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    User existingUser = snapshot.getValue(User.class);
+                    if (existingUser != null && !existingUser.getId().equals(user.getUid())) {
+                        isUnique = false;
+                        break;
+                    }
+                }
+
+                if (isUnique) {
+                    updateEmailAndPhone(user, newName, newEmail, newPhone);
+                } else {
+                    Toast.makeText(getContext(), "Phone number is already in use", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Toast.makeText(getContext(), "Failed to check phone number: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+
+
     private void updateEmailAndPhone(FirebaseUser user, String newName, String newEmail, String newPhone) {
         if (newEmail == null || newEmail.trim().isEmpty()) {
             saveUserToDatabase(user.getUid(), newName, user.getEmail(), newPhone);
         } else {
-            user.updateEmail(newEmail)
-                    .addOnCompleteListener(task -> {
-                        if (task.isSuccessful()) {
-                            saveUserToDatabase(user.getUid(), newName, newEmail, newPhone);
-                        } else {
-                            Toast.makeText(getContext(), "Failed to update email: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                    });
+            promptForPasswordAndReauthenticate(user, newEmail, newName, newPhone);
         }
     }
+
+
 
     private void saveUserToDatabase(String uid, String name, String email, String phone) {
         Map<String, Object> userUpdates = new HashMap<>();
@@ -222,16 +257,73 @@ public class EditProfileFragment extends Fragment {
     private void updateUserProfile(String uid, Map<String, Object> userUpdates) {
         dbManager.updateUserProfile(uid, userUpdates, task -> {
             if (task.isSuccessful()) {
-                Toast.makeText(getContext(), "Profile updated successfully", Toast.LENGTH_SHORT).show();
+                Context context = getContext();
+                if (context != null) {
+                    Toast.makeText(context, "Profile updated successfully", Toast.LENGTH_SHORT).show();
+                }
                 if (!userUpdates.get("name").equals(originalName)) {
                     updateAvatarIfNameChanged(uid, (String) userUpdates.get("name"));
                 }
                 getParentFragmentManager().popBackStack();
             } else {
-                Toast.makeText(getContext(), "Failed to save user data to database", Toast.LENGTH_SHORT).show();
+                Context context = getContext();
+                if (context != null) {
+                    Toast.makeText(context, "Failed to save user data to database", Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }
+
+
+    private void navigateToProfile() {
+        getParentFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, new ProfileFragment())
+                .addToBackStack(null)
+                .commit();
+    }
+    private void promptForPasswordAndReauthenticate(FirebaseUser user, String newEmail, String newName, String newPhone) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Reauthenticate");
+
+        final EditText passwordInput = new EditText(getContext());
+        passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        passwordInput.setHint("Enter your current password");
+
+        builder.setView(passwordInput);
+
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            String password = passwordInput.getText().toString().trim();
+            if (!password.isEmpty()) {
+                reauthenticateAndChangeEmail(user, newEmail, newName, newPhone, password);
+            } else {
+                Toast.makeText(getContext(), "Password cannot be empty", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        builder.show();
+    }
+
+    private void reauthenticateAndChangeEmail(FirebaseUser user, String newEmail, String newName, String newPhone, String password) {
+        AuthCredential credential = EmailAuthProvider.getCredential(user.getEmail(), password);
+
+        user.reauthenticate(credential).addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                user.updateEmail(newEmail).addOnCompleteListener(emailTask -> {
+                    if (emailTask.isSuccessful()) {
+                        saveUserToDatabase(user.getUid(), newName, newEmail, newPhone);
+                    } else {
+                        Toast.makeText(getContext(), "Failed to update email: " + emailTask.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else {
+                Toast.makeText(getContext(), "Reauthentication failed: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
 
     private void updateAvatarIfNameChanged(String uid, String newName) {
         AvatarUtils.loadAvatarData(uid, newName, (oldInitials, oldColor) -> {
