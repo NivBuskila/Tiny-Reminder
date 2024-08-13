@@ -250,16 +250,16 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 User user = snapshot.getValue(User.class);
                 if (user != null) {
-                    Log.d(TAG, "onDataChange: User data retrieved. Family ID: " + user.getFamilyId());
-
                     if (user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
+                        Log.d(TAG, "onDataChange: User data retrieved. Family ID: " + user.getFamilyId());
                         fetchFamilyLocations(user.getFamilyId());
                     } else {
-                        Log.e(TAG, "User is not associated with any family");
-                        Toast.makeText(getContext(), "User is not associated with any family", Toast.LENGTH_SHORT).show();
+                        Log.d(TAG, "onDataChange: User does not belong to a family");
+                        // Handle case for user without family
+                        showNoFamilyMessage();
                     }
                 } else {
-                    Log.e(TAG, "onDataChange: User data is null. User: " + user);
+                    Log.e(TAG, "onDataChange: User data is null");
                     Toast.makeText(getContext(), "Error loading user data", Toast.LENGTH_SHORT).show();
                 }
             }
@@ -272,6 +272,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
+    private void showNoFamilyMessage() {
+        Toast.makeText(getContext(), "You are not part of a family. Please join or create a family first.", Toast.LENGTH_LONG).show();
+    }
 
     private void fetchFamilyLocations(String familyId) {
         Log.d(TAG, "fetchFamilyLocations: Fetching locations for family ID: " + familyId);

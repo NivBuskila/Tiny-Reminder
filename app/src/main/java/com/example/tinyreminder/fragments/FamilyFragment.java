@@ -43,11 +43,14 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     private FloatingActionButton addMemberButton;
     private FloatingActionButton removeMemberButton;
     private boolean isCurrentUserAdmin = false;
+    private boolean isUserInFamily = false;
     private String currentFamilyId;
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
     }
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -88,12 +91,15 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
-                if (user != null && user.getFamilyId() != null) {
+                if (user != null && user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
+                    isUserInFamily = true;
                     currentFamilyId = user.getFamilyId();
                     fetchFamilyMembers(currentFamilyId);
                     checkAdminStatus(currentUser.getUid(), currentFamilyId);
                 } else {
+                    isUserInFamily = false;
                     showNoMembersMessage();
+                    updateUIForAdminStatus();
                 }
             }
 
@@ -101,6 +107,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             public void onCancelled(@NonNull DatabaseError databaseError) {
                 Log.w(TAG, "loadUser:onCancelled", databaseError.toException());
                 showNoMembersMessage();
+                updateUIForAdminStatus();
             }
         });
     }
@@ -172,6 +179,11 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     private void showNoMembersMessage() {
         familyMembersList.setVisibility(View.GONE);
         noMembersTextView.setVisibility(View.VISIBLE);
+        if (!isUserInFamily) {
+            noMembersTextView.setText("You are not in a family. Join or create a family from your profile.");
+        } else {
+            noMembersTextView.setText("No family members");
+        }
     }
 
     private void checkAdminStatus(String userId, String familyId) {
@@ -190,7 +202,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void updateUIForAdminStatus() {
-        if (isCurrentUserAdmin) {
+        if (isUserInFamily && isCurrentUserAdmin) {
             addMemberButton.setVisibility(View.VISIBLE);
             removeMemberButton.setVisibility(View.VISIBLE);
         } else {
@@ -309,18 +321,17 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                 }
             }
 
-            private void navigateToProfileScreen() {
-                // Navigate to the profile screen
-                if (getActivity() instanceof MainActivity) {
-                    ((MainActivity) getActivity()).navigateToProfile();
-                }
-            }
-
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
                 Log.w(TAG, "checkAndDeleteEmptyFamily:onCancelled", databaseError.toException());
             }
         });
+    }
+
+    private void navigateToProfileScreen() {
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).navigateToProfile();
+        }
     }
 
     @Override
@@ -361,11 +372,6 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             }
         });
         builder.show();
-    }
-
-    private void navigateToMapFragment(FamilyMember member) {
-        // TODO: Implement navigation to MapFragment
-        Toast.makeText(getContext(), "Navigating to map for " + member.getName(), Toast.LENGTH_SHORT).show();
     }
 
     private void makeAdmin(FamilyMember member) {
