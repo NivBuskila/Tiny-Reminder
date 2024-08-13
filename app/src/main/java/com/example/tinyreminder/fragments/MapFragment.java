@@ -59,7 +59,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private static final float DEFAULT_ZOOM = 15f;
     private static final float MAX_ZOOM = 18f;
-
+    private boolean isNavigatedFromBottomNav = false;
     private GoogleMap map;
     private String memberId;
     private DatabaseManager dbManager;
@@ -75,12 +75,26 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         fragment.setArguments(args);
         return fragment;
     }
-
+    public static MapFragment newInstance(boolean fromBottomNav, String memberId) {
+        MapFragment fragment = new MapFragment();
+        Bundle args = new Bundle();
+        args.putBoolean("fromBottomNav", fromBottomNav);
+        args.putString(ARG_MEMBER_ID, memberId);
+        fragment.setArguments(args);
+        return fragment;
+    }
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
             memberId = getArguments().getString(ARG_MEMBER_ID);
+            isNavigatedFromBottomNav = getArguments().getBoolean("fromBottomNav", false);
+        }
+        if (memberId == null || memberId.isEmpty()) {
+            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+            if (currentUser != null) {
+                memberId = currentUser.getUid();
+            }
         }
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
         dbManager = new DatabaseManager();
@@ -110,6 +124,21 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         enableMyLocation();
         setupMapSettings();
         setupLocationListener();
+        if (isNavigatedFromBottomNav) {
+            zoomToCurrentUser();
+        }
+    }
+
+    private void zoomToCurrentUser() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+                if (location != null) {
+                    LatLng currentLocation = new LatLng(location.getLatitude(), location.getLongitude());
+                    map.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLocation, DEFAULT_ZOOM));
+                }
+            });
+        }
     }
 
     private void setupMapSettings() {
@@ -239,6 +268,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         dbManager.getLocationsForFamily(familyId, task -> {
             if (task.isSuccessful()) {
                 Map<String, LatLng> familyLocations = task.getResult();
+                Log.d(TAG, "fetchFamilyLocations: Received " + familyLocations.size() + " family member locations");
                 boolean hasLocations = false;
                 for (Map.Entry<String, LatLng> entry : familyLocations.entrySet()) {
                     String memberId = entry.getKey();

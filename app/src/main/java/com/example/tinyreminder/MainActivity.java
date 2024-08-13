@@ -60,7 +60,10 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.navigation_family) {
                 selectedFragment = new FamilyFragment();
             } else if (itemId == R.id.navigation_map) {
-                selectedFragment = new MapFragment();
+                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                if (currentUser != null) {
+                    selectedFragment = MapFragment.newInstance(true, currentUser.getUid());
+                }
             }
 
             if (selectedFragment != null) {
