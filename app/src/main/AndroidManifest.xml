@@ -34,6 +34,18 @@
             android:enabled="true"
             android:exported="false" />
 
+        <service
+            android:name=".services.ParkingDetectionService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name=".receivers.NotificationTimeoutReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBKZ5IozLVQ6iHz9z3yJolEUzRN_ZStlnI"/>

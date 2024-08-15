@@ -21,6 +21,7 @@ import com.example.tinyreminder.fragments.LoginFragment;
 import com.example.tinyreminder.fragments.MapFragment;
 import com.example.tinyreminder.fragments.ProfileFragment;
 import com.example.tinyreminder.services.LocationUpdateService;
+import com.example.tinyreminder.services.ParkingDetectionService;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -80,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
                     new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                     LOCATION_PERMISSION_REQUEST_CODE);
         } else {
-            startLocationService();
+            startLocationServices();
         }
     }
 
@@ -89,16 +90,19 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startLocationService();
+                startLocationServices();
             } else {
                 Toast.makeText(this, "Location permission is necessary for the app to function properly", Toast.LENGTH_LONG).show();
             }
         }
     }
 
-    private void startLocationService() {
-        Intent serviceIntent = new Intent(this, LocationUpdateService.class);
-        startService(serviceIntent);
+    private void startLocationServices() {
+        Intent locationServiceIntent = new Intent(this, LocationUpdateService.class);
+        startService(locationServiceIntent);
+
+        Intent parkingDetectionServiceIntent = new Intent(this, ParkingDetectionService.class);
+        startService(parkingDetectionServiceIntent);
     }
 
     private void setupBackPressedCallback() {
