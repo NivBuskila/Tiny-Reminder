@@ -52,12 +52,14 @@ public class ProfileFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "ProfileFragment: onCreate");
         dbManager = new DatabaseManager();
         mAuth = FirebaseAuth.getInstance();
     }
     @Override
     public void onResume() {
         super.onResume();
+        Log.d(TAG, "ProfileFragment: onResume");
         loadUserData();
     }
 

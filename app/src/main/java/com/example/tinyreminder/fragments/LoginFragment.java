@@ -16,11 +16,11 @@ import androidx.fragment.app.Fragment;
 
 import com.example.tinyreminder.MainActivity;
 import com.example.tinyreminder.R;
+import com.example.tinyreminder.databinding.FragmentLoginBinding;
 import com.example.tinyreminder.models.User;
 import com.example.tinyreminder.utils.AvatarUtils;
 import com.example.tinyreminder.utils.DatabaseManager;
 import com.firebase.ui.auth.AuthUI;
-import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.FirebaseAuthUIActivityResultContract;
 import com.firebase.ui.auth.IdpResponse;
 import com.firebase.ui.auth.data.model.FirebaseAuthUIAuthenticationResult;
@@ -38,55 +38,99 @@ public class LoginFragment extends Fragment {
 
     private static final String TAG = "LoginFragment";
 
+    private FragmentLoginBinding binding;  // Binding for the login fragment layout
+    private FirebaseAuth firebaseAuth;  // Firebase authentication instance
+    private FirebaseAuth.AuthStateListener authStateListener;  // Listener for authentication state changes
+    private DatabaseManager dbManager;  // Database manager for user data
     private final ActivityResultLauncher<Intent> signInLauncher = registerForActivityResult(
             new FirebaseAuthUIActivityResultContract(),
             this::onSignInResult
     );
 
-    private DatabaseManager dbManager;
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Initialize Firebase Auth
+        firebaseAuth = FirebaseAuth.getInstance();
+
+        // Set up an AuthStateListener to handle state changes
+        authStateListener = firebaseAuth -> {
+            FirebaseUser user = firebaseAuth.getCurrentUser();
+            if (user != null) {
+                navigateToProfileScreen();
+            }
+        };
+
+        // Initialize the DatabaseManager
+        dbManager = new DatabaseManager();
+    }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_login, container, false);
+        binding = FragmentLoginBinding.inflate(inflater, container, false);
+        return binding.getRoot();
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        dbManager = new DatabaseManager();
-        signIn();
+
+        binding.loginButton.setOnClickListener(v -> signIn());
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        // Add the AuthStateListener when the fragment starts
+        firebaseAuth.addAuthStateListener(authStateListener);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        // Remove the AuthStateListener when the fragment stops
+        if (authStateListener != null) {
+            firebaseAuth.removeAuthStateListener(authStateListener);
+        }
     }
 
     private void signIn() {
         List<AuthUI.IdpConfig> providers = Arrays.asList(
                 new AuthUI.IdpConfig.EmailBuilder().build(),
                 new AuthUI.IdpConfig.PhoneBuilder().build(),
-                new AuthUI.IdpConfig.GoogleBuilder().build());
+                new AuthUI.IdpConfig.GoogleBuilder().build()
+        );
 
         Intent signInIntent = AuthUI.getInstance()
                 .createSignInIntentBuilder()
                 .setAvailableProviders(providers)
                 .setIsSmartLockEnabled(false)
                 .setTheme(R.style.LoginTheme)
-                .setLogo(R.drawable.ic_logo)
-                .setTosAndPrivacyPolicyUrls("https://example.com/terms", "https://example.com/privacy")
+                .setLogo(R.drawable.ic_logo)  // Set the logo for the login screen
+                .setTosAndPrivacyPolicyUrls(
+                        "https://example.com/terms",  // Link to Terms of Service
+                        "https://example.com/privacy"  // Link to Privacy Policy
+                )
                 .build();
         signInLauncher.launch(signInIntent);
     }
 
     private void onSignInResult(FirebaseAuthUIAuthenticationResult result) {
+        Log.d(TAG, "LoginFragment: onSignInResult called");
         IdpResponse response = result.getIdpResponse();
         if (result.getResultCode() == Activity.RESULT_OK) {
             FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            Log.d(TAG, "Sign in successful. User ID: " + user.getUid());
-            // Handle successful sign-in
-            ((MainActivity) requireActivity()).navigateToProfile();
-            Log.d(TAG, "Attempted to navigate to profile");
+            Log.d(TAG, "LoginFragment: signInWithCredential:success, user: " + (user != null ? user.getUid() : "null"));
+            if (user != null) {
+                Log.d(TAG, "LoginFragment: Attempting to navigate to profile");
+                checkExistingUser(user.getUid(), user);
+            }
         } else {
-            // Handle sign-in failure
-            Log.e(TAG, "Sign in failed. Response: " + response);
+            Log.w(TAG, "LoginFragment: signInWithCredential:failure", response != null ? response.getError() : null);
+            handleSignInError(response);
         }
     }
 
@@ -111,6 +155,10 @@ public class LoginFragment extends Fragment {
     }
 
     private void updateExistingUser(User existingUser, FirebaseUser firebaseUser) {
+        if (existingUser == null) {
+            Log.e(TAG, "updateExistingUser: existingUser is null");
+            return;
+        }
         existingUser.setName(firebaseUser.getDisplayName());
         existingUser.setEmail(firebaseUser.getEmail());
         if (existingUser.getPhoneNumber() == null || existingUser.getPhoneNumber().isEmpty()) {
@@ -121,13 +169,14 @@ public class LoginFragment extends Fragment {
             if (task.isSuccessful()) {
                 Log.d(TAG, "User updated successfully");
                 checkAndCreateUserAvatar(existingUser.getId(), existingUser.getName());
-                ((MainActivity) requireActivity()).navigateToProfile();
+                navigateToProfileScreen();
             } else {
                 Log.e(TAG, "Failed to update user", task.getException());
                 Toast.makeText(requireContext(), "Failed to update user", Toast.LENGTH_SHORT).show();
             }
         });
     }
+
 
     private void createNewUser(String userId, FirebaseUser firebaseUser) {
         final String displayName = firebaseUser.getDisplayName() != null ? firebaseUser.getDisplayName() :
@@ -145,7 +194,7 @@ public class LoginFragment extends Fragment {
                 Log.d(TAG, "User created successfully in database");
                 updateUserDisplayName(firebaseUser, displayName);
                 createAndSaveUserAvatar(userId, displayName);
-                ((MainActivity) requireActivity()).navigateToProfile();
+                navigateToProfileScreen();
             } else {
                 Log.e(TAG, "Failed to create user in database", task.getException());
                 Toast.makeText(requireContext(), "Failed to create user", Toast.LENGTH_SHORT).show();
@@ -193,5 +242,19 @@ public class LoginFragment extends Fragment {
                 AvatarUtils.saveAvatarData(userId, newInitials, newColor);
             }
         });
+    }
+
+    private void navigateToProfileScreen() {
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).loadFragment(new ProfileFragment());
+        }
+    }
+
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // Clean up the binding to avoid memory leaks
+        binding = null;
     }
 }

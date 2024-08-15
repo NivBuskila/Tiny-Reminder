@@ -31,9 +31,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private FirebaseAuth mAuth;
+    private FirebaseAuth.AuthStateListener mAuthListener;
     private BottomNavigationView bottomNavigationView;
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
 
         setupBottomNavigation();
         setupBackPressedCallback();
+        setupAuthStateListener();
         checkUserAuthState();
     }
 
@@ -72,6 +72,7 @@ public class MainActivity extends AppCompatActivity {
             return true;
         });
     }
+
     private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -85,9 +86,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode,
-                permissions,
-                grantResults);
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationService();
@@ -115,14 +114,26 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void setupAuthStateListener() {
+        mAuthListener = firebaseAuth -> {
+            FirebaseUser user = firebaseAuth.getCurrentUser();
+            Log.d(TAG, "onAuthStateChanged: " + (user != null ? user.getUid() : "null"));
+            if (user != null) {
+                navigateToProfile();
+            } else {
+                navigateToLogin();
+            }
+        };
+    }
+
     private void checkUserAuthState() {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
-            loadFragment(new ProfileFragment());
-            bottomNavigationView.setVisibility(View.VISIBLE);
+            Log.d(TAG, "User is signed in, navigating to profile");
+            navigateToProfile();
         } else {
-            loadFragment(new LoginFragment());
-            bottomNavigationView.setVisibility(View.GONE);
+            Log.d(TAG, "User is not signed in, navigating to login");
+            navigateToLogin();
         }
     }
 
@@ -130,26 +141,52 @@ public class MainActivity extends AppCompatActivity {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.replace(R.id.fragment_container, fragment);
+        fragmentTransaction.addToBackStack(null);
         fragmentTransaction.commit();
     }
 
+
+
+
     public void navigateToLogin() {
+        Log.d(TAG, "Navigating to login");
         loadFragment(new LoginFragment());
         bottomNavigationView.setVisibility(View.GONE);
     }
 
     public void navigateToProfile() {
-        loadFragment(new ProfileFragment());
+        Log.d(TAG, "MainActivity: navigateToProfile called");
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+
+        // לוג נוסף לבדוק אם ה-Fragment הנוכחי הוא ה-ProfileFragment
+        if (currentFragment instanceof ProfileFragment) {
+            Log.d(TAG, "MainActivity: ProfileFragment is already displayed");
+            return;
+        }
+
+        Fragment profileFragment = new ProfileFragment();
+        loadFragment(profileFragment);
+        Log.d(TAG, "MainActivity: after loadFragment call");
+
         bottomNavigationView.setVisibility(View.VISIBLE);
         bottomNavigationView.setSelectedItemId(R.id.navigation_profile);
     }
 
+
+
     @Override
     protected void onStart() {
         super.onStart();
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
-            navigateToLogin();
+        Log.d(TAG, "MainActivity: onStart");
+        mAuth.addAuthStateListener(mAuthListener);
+        checkUserAuthState();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (mAuthListener != null) {
+            mAuth.removeAuthStateListener(mAuthListener);
         }
     }
 }
