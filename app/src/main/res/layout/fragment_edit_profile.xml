@@ -1,9 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:background="#E0F7FA"> <!-- Light blue background -->
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,8 +17,8 @@
             android:layout_height="120dp"
             android:layout_gravity="center_horizontal"
             android:src="@drawable/default_avatar"
-            app:civ_border_color="#FF000000"
-            app:civ_border_width="2dp" />
+            app:civ_border_color="#000000"
+        app:civ_border_width="2dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/change_photo_button"
@@ -26,7 +26,9 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="8dp"
-            android:text="Change Photo" />
+            android:backgroundTint="#00BFFF"
+        android:textColor="#FFFFFF"
+        android:text="Change Photo" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
@@ -39,7 +41,9 @@
                 android:id="@+id/edit_name"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textPersonName" />
+                android:inputType="textPersonName"
+                android:textColor="#000000"
+            android:backgroundTint="#00BFFF"/>
 
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -54,7 +58,9 @@
                 android:id="@+id/edit_email"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textEmailAddress" />
+                android:inputType="textEmailAddress"
+                android:textColor="#000000"
+            android:backgroundTint="#00BFFF"/>
 
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -69,7 +75,9 @@
                 android:id="@+id/edit_phone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="phone" />
+                android:inputType="phone"
+                android:textColor="#000000"
+            android:backgroundTint="#00BFFF"/>
 
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -78,7 +86,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Save Profile" />
+            android:backgroundTint="#00BFFF"
+        android:textColor="#FFFFFF"
+        android:text="Save Profile" />
 
     </LinearLayout>
 </ScrollView>

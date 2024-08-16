@@ -57,8 +57,8 @@ public class NotificationHelper {
         intent.putExtra("userId", userId);
         intent.putExtra("notificationId", notificationId);
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, notificationId, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, notificationId, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + NOTIFICATION_TIMEOUT, pendingIntent);
     }
