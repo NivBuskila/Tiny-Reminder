@@ -8,6 +8,7 @@ public class Family {
     public String name;
     public Map<String, Boolean> memberIds;
     public Map<String, Boolean> adminIds;
+    public Map<String, Map<String, Double>> memberLocations;
 
     public Family() {
         // Default constructor required for calls to DataSnapshot.getValue(Family.class)
@@ -18,14 +19,22 @@ public class Family {
         this.name = name;
         this.memberIds = new HashMap<>();
         this.adminIds = new HashMap<>();
+        this.memberLocations = new HashMap<>();
         this.memberIds.put(creatorId, true);
         this.adminIds.put(creatorId, true);
     }
 
-    // Existing getters and setters...
+    //  getters and setters
 
     public Map<String, Boolean> getAdminIds() {
         return adminIds;
+    }
+    public Map<String, Map<String, Double>> getMemberLocations() {
+        return memberLocations;
+    }
+
+    public void setMemberLocations(Map<String, Map<String, Double>> memberLocations) {
+        this.memberLocations = memberLocations;
     }
 
     public void setAdminIds(Map<String, Boolean> adminIds) {

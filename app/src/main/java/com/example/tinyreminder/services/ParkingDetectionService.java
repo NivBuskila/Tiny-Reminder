@@ -1,18 +1,33 @@
 package com.example.tinyreminder.services;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.location.Location;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
-import androidx.annotation.Nullable;
-import com.google.android.gms.location.*;
-import com.example.tinyreminder.utils.NotificationHelper;
-import com.google.firebase.auth.FirebaseAuth;
-import java.util.LinkedList;
 
-public class ParkingDetectionService extends Service {
+import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
+
+import com.example.tinyreminder.MainActivity;
+import com.example.tinyreminder.R;
+import com.example.tinyreminder.utils.NotificationHelper;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
+import com.google.firebase.auth.FirebaseAuth;
+
+    public class ParkingDetectionService extends Service {
     private static final String TAG = "ParkingDetectionService";
     private static final float DRIVING_SPEED_THRESHOLD = 15f; // km/h
     private static final float PARKING_SPEED_THRESHOLD = 5f; // km/h
@@ -20,6 +35,8 @@ public class ParkingDetectionService extends Service {
     private static final float MIN_DISTANCE_CHANGE = 10; // meters
     private static final int LOCATION_INTERVAL = 5000; // 5 seconds
     private static final float MS_TO_KMH = 3.6f;
+    private static final int NOTIFICATION_ID = 1;
+    private static final String CHANNEL_ID = "LocationServiceChannel";
 
     private enum VehicleState {
         PARKED,
@@ -37,10 +54,39 @@ public class ParkingDetectionService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        createNotificationChannel();
+        Notification notification = buildNotification();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+        }
         Log.d(TAG, "ParkingDetectionService created");
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         createLocationCallback();
         startLocationUpdates();
+    }
+
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel serviceChannel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Location Service Channel",
+                    NotificationManager.IMPORTANCE_DEFAULT
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            manager.createNotificationChannel(serviceChannel);
+        }
+    }
+    private Notification buildNotification() {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
+
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Location Tracking")
+                .setContentText("Tracking your location")
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentIntent(pendingIntent)
+                .build();
     }
 
     private void createLocationCallback() {
@@ -131,6 +177,7 @@ public class ParkingDetectionService extends Service {
         }
     }
 
+
     private String getCurrentUserId() {
         FirebaseAuth auth = FirebaseAuth.getInstance();
         if (auth.getCurrentUser() != null) {
@@ -144,11 +191,11 @@ public class ParkingDetectionService extends Service {
         LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, LOCATION_INTERVAL)
                 .setMinUpdateIntervalMillis(LOCATION_INTERVAL)
                 .build();
-
         try {
             fusedLocationClient.requestLocationUpdates(locationRequest,
                     locationCallback,
                     Looper.getMainLooper());
+
             Log.d(TAG, "Location updates started");
         } catch (SecurityException e) {
             Log.e(TAG, "Error starting location updates", e);

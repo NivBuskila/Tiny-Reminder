@@ -37,6 +37,8 @@ firebase-storage = { module = "com.google.firebase:firebase-storage", version.re
 firebase-ui-auth = { module = "com.firebaseui:firebase-ui-auth", version.ref = "firebaseUiAuth" }
 glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
 glide-v4120 = { module = "com.github.bumptech.glide:glide", version.ref = "glideVersion" }
+google-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+google-firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 google-services = { module = "com.google.gms:google-services", version.ref = "googleServices" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

@@ -138,12 +138,18 @@ public class DatabaseManager {
         mDatabase.child("users").child(userId).addListenerForSingleValueEvent(listener);
     }
 
-    public Task<Void> updateMemberLocation(String userId, double latitude, double longitude) {
+    public Task<Void> updateMemberLocation(String userId, String familyId, double latitude, double longitude) {
         Map<String, Object> locationUpdates = new HashMap<>();
         locationUpdates.put("latitude", latitude);
         locationUpdates.put("longitude", longitude);
-        return mDatabase.child("locations").child(userId).setValue(locationUpdates);
+
+        if (familyId != null) {
+            return mDatabase.child("families").child(familyId).child("memberLocations").child(userId).setValue(locationUpdates);
+        } else {
+            return Tasks.forException(new Exception("User is not in a family"));
+        }
     }
+
 
     public void createOrUpdateUser(User user, final OnCompleteListener<Void> listener) {
         mDatabase.child("users").child(user.getId()).setValue(user)
@@ -180,11 +186,11 @@ public class DatabaseManager {
                         for (DataSnapshot memberSnapshot : dataSnapshot.getChildren()) {
                             String memberId = memberSnapshot.getKey();
                             if (memberId != null) {
-                                mDatabase.child("locations").child(memberId).addListenerForSingleValueEvent(new ValueEventListener() {
+                                mDatabase.child("users").child(memberId).addValueEventListener(new ValueEventListener() {
                                     @Override
-                                    public void onDataChange(@NonNull DataSnapshot locationSnapshot) {
-                                        Double lat = locationSnapshot.child("latitude").getValue(Double.class);
-                                        Double lng = locationSnapshot.child("longitude").getValue(Double.class);
+                                    public void onDataChange(@NonNull DataSnapshot userSnapshot) {
+                                        Double lat = userSnapshot.child("latitude").getValue(Double.class);
+                                        Double lng = userSnapshot.child("longitude").getValue(Double.class);
                                         if (lat != null && lng != null) {
                                             familyLocations.put(memberId, new LatLng(lat, lng));
                                         }
@@ -209,6 +215,9 @@ public class DatabaseManager {
                 });
     }
 
+
+
+
     public Task<Void> setUserStatus(String userId, String status) {
         return mDatabase.child("users").child(userId).child("status").setValue(status);
     }
@@ -224,10 +233,36 @@ public class DatabaseManager {
     public void getLastCheckInTime(String userId, final ValueEventListener listener) {
         mDatabase.child("users").child(userId).child("lastCheckIn").addListenerForSingleValueEvent(listener);
     }
+    public void getRealtimeLocationsForFamily(String familyId, ValueEventListener listener) {
+        mDatabase.child("families").child(familyId).child("memberLocations").addValueEventListener(listener);
+    }
 
     public void getUsersByPhoneNumber(String phoneNumber, ValueEventListener listener) {
         DatabaseReference usersRef = FirebaseDatabase.getInstance().getReference("users");
         usersRef.orderByChild("phoneNumber").equalTo(phoneNumber).addListenerForSingleValueEvent(listener);
+    }
+
+    public void saveFcmToken(String userId, String token) {
+        mDatabase.child("users").child(userId).child("fcmToken").setValue(token)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        Log.d(TAG, "FCM token saved successfully");
+                    } else {
+                        Log.e(TAG, "Failed to save FCM token", task.getException());
+                    }
+                });
+    }
+
+    public void getFcmToken(String userId, ValueEventListener listener) {
+        mDatabase.child("users").child(userId).child("fcmToken").addListenerForSingleValueEvent(listener);
+    }
+
+    public void setNotificationResponseFlag(String userId, int notificationId, boolean hasResponded) {
+        mDatabase.child("users").child(userId).child("notifications").child(String.valueOf(notificationId)).child("hasResponded").setValue(hasResponded);
+    }
+
+    public void getNotificationResponseFlag(String userId, int notificationId, ValueEventListener listener) {
+        mDatabase.child("users").child(userId).child("notifications").child(String.valueOf(notificationId)).child("hasResponded").addListenerForSingleValueEvent(listener);
     }
 
 }

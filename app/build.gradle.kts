@@ -58,6 +58,10 @@ dependencies {
     implementation(libs.firebase.database)
     implementation(libs.firebase.storage)
     implementation (libs.firebase.messaging)
+    implementation(libs.google.firebase.messaging)
+    implementation(libs.google.firebase.analytics)
+
+
 
     //glide
 

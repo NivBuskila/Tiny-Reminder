@@ -25,32 +25,45 @@ public class NotificationTimeoutReceiver extends BroadcastReceiver {
             return;
         }
 
-        // Check if the notification has been responded to
-        if (!hasUserRespondedToNotification(userId, notificationId)) {
-            // If not, send notification to family members
-            DatabaseManager dbManager = new DatabaseManager();
-            dbManager.getUserData(userId, new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    User user = dataSnapshot.getValue(User.class);
-                    if (user != null && user.getFamilyId() != null) {
-                        NotificationHelper.sendFamilyNotification(context, user.getFamilyId());
-                    } else {
-                        Log.e(TAG, "User or family ID is null");
-                    }
+        DatabaseManager dbManager = new DatabaseManager();
+        dbManager.getUserStatus(userId, new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                String status = dataSnapshot.getValue(String.class);
+                if (status == null || "PENDING".equals(status)) {
+                    sendNotificationToFamilyMembers(context, userId);
+                } else {
+                    Log.d(TAG, "User " + userId + " has already responded. Status: " + status);
                 }
+            }
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Log.e(TAG, "Error fetching user data: " + databaseError.getMessage());
-                }
-            });
-        }
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e(TAG, "Error fetching user status: " + databaseError.getMessage());
+            }
+        });
     }
 
-    private boolean hasUserRespondedToNotification(String userId, int notificationId) {
-        // TODO: Implement method to check if user has responded to the notification
-        // This could involve checking a flag in the database
-        return false;
+    private void sendNotificationToFamilyMembers(Context context, String userId) {
+        DatabaseManager dbManager = new DatabaseManager();
+        dbManager.getUserData(userId, new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                User user = dataSnapshot.getValue(User.class);
+                if (user != null && user.getFamilyId() != null) {
+                    Log.d(TAG, "Sending family notification except user: " + userId);
+                    NotificationHelper.sendFamilyNotificationExceptUser(context, user.getFamilyId(), userId);
+                } else {
+                    Log.e(TAG, "User or family ID is null");
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e(TAG, "Error fetching user data: " + databaseError.getMessage());
+            }
+        });
     }
+
+
 }

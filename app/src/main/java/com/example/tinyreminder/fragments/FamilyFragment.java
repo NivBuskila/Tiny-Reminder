@@ -146,6 +146,10 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                             String role = isAdmin ? "Manager" : "Member";
                             FamilyMember member = new FamilyMember(user.getId(), user.getName(), role);
                             member.setProfilePictureUrl(user.getProfilePictureUrl());
+
+                            // Update member status
+                            member.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
+
                             members.add(member);
                             updateUI(members);
                         }
@@ -164,6 +168,18 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             }
         });
     }
+
+    private FamilyMember.ResponseStatus convertStatusToResponseStatus(String status) {
+        if ("OK".equals(status)) {
+            return FamilyMember.ResponseStatus.OK;
+        } else if ("PENDING".equals(status)) {
+            return FamilyMember.ResponseStatus.PENDING;
+        } else if ("ALERT".equals(status)) {
+            return FamilyMember.ResponseStatus.ALERT;
+        }
+        return FamilyMember.ResponseStatus.PENDING; // Default if status is unknown
+    }
+
 
     private void updateUI(List<FamilyMember> members) {
         if (members.isEmpty()) {
