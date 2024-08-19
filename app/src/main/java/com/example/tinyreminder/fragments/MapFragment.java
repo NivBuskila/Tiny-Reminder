@@ -286,34 +286,53 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private void setupRealtimeFamilyLocationUpdates(String familyId) {
-        boundsBuilder = new LatLngBounds.Builder();
         dbManager.getRealtimeLocationsForFamily(familyId, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                boolean significantChange = false;
                 for (DataSnapshot memberSnapshot : dataSnapshot.getChildren()) {
                     String memberId = memberSnapshot.getKey();
                     Double latitude = memberSnapshot.child("latitude").getValue(Double.class);
                     Double longitude = memberSnapshot.child("longitude").getValue(Double.class);
                     if (latitude != null && longitude != null) {
                         LatLng newLocation = new LatLng(latitude, longitude);
-                        LatLng oldLocation = lastKnownLocations.get(memberId);
-                        if (oldLocation == null || distanceBetween(oldLocation, newLocation) > 50) { // 50 meters threshold
-                            significantChange = true;
-                            lastKnownLocations.put(memberId, newLocation);
-                            updateMemberMarker(memberId, newLocation);
-                            boundsBuilder.include(newLocation);
-                        }
+                        updateMemberMarker(memberId, newLocation);
                     }
-                }
-                if (significantChange) {
-                    adjustMapZoom();
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
                 Log.e(TAG, "Error fetching family locations: ", databaseError.toException());
+            }
+        });
+    }
+
+    private void updateMapView() {
+        if (map == null || markers.isEmpty()) {
+            return;
+        }
+
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        for (Marker marker : markers.values()) {
+            builder.include(marker.getPosition());
+        }
+        LatLngBounds bounds = builder.build();
+
+        int padding = 100;
+        CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, padding);
+
+        map.animateCamera(cu, new GoogleMap.CancelableCallback() {
+            @Override
+            public void onFinish() {
+
+                if (map.getCameraPosition().zoom > MAX_ZOOM) {
+                    map.animateCamera(CameraUpdateFactory.zoomTo(MAX_ZOOM));
+                }
+            }
+
+            @Override
+            public void onCancel() {
+
             }
         });
     }
@@ -392,21 +411,32 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
             CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, width, height, MAP_PADDING);
 
-            map.animateCamera(cu, new GoogleMap.CancelableCallback() {
-                @Override
-                public void onFinish() {
-                    // Ensure we're not zoomed in too far
-                    if (map.getCameraPosition().zoom > DEFAULT_ZOOM) {
-                        map.animateCamera(CameraUpdateFactory.zoomTo(DEFAULT_ZOOM));
-                    }
-                    lastZoomAdjustment = System.currentTimeMillis();
+            LatLngBounds currentBounds = map.getProjection().getVisibleRegion().latLngBounds;
+            boolean allMarkersVisible = true;
+            for (Marker marker : markers.values()) {
+                if (!currentBounds.contains(marker.getPosition())) {
+                    allMarkersVisible = false;
+                    break;
                 }
+            }
 
-                @Override
-                public void onCancel() {
-                    Log.d(TAG, "Map animation cancelled");
-                }
-            });
+            if (!allMarkersVisible) {
+                map.animateCamera(cu, new GoogleMap.CancelableCallback() {
+                    @Override
+                    public void onFinish() {
+                        // Ensure we're not zoomed in too far
+                        if (map.getCameraPosition().zoom > DEFAULT_ZOOM) {
+                            map.animateCamera(CameraUpdateFactory.zoomTo(DEFAULT_ZOOM));
+                        }
+                        lastZoomAdjustment = System.currentTimeMillis();
+                    }
+
+                    @Override
+                    public void onCancel() {
+                        Log.d(TAG, "Map animation cancelled");
+                    }
+                });
+            }
         } catch (IllegalStateException e) {
             Log.e(TAG, "adjustMapZoom: Error adjusting map zoom", e);
             // Fallback to default zoom on a single location if bounds are invalid
@@ -534,12 +564,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 Marker marker = map.addMarker(markerOptions);
                 markers.put(userId, marker);
             }
-
-            // If this is the focused member, ensure they're visible
-            if (userId.equals(memberId)) {
-                Log.d(TAG, "addOrUpdateMarkerOnMap: Ensuring focused member is visible: " + userId);
-                ensureFocusedMemberVisible(location);
-            }
         } else {
             Log.e(TAG, "addOrUpdateMarkerOnMap: Map is null");
         }
@@ -549,7 +573,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         Log.d(TAG, "ensureFocusedMemberVisible: Ensuring focused member is visible");
         if (map != null && !map.getProjection().getVisibleRegion().latLngBounds.contains(location)) {
             Log.d(TAG, "ensureFocusedMemberVisible: Animating camera to focused member");
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(location, MAX_ZOOM));
+            map.animateCamera(CameraUpdateFactory.newLatLng(location));
         }
     }
 

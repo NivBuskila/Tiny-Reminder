@@ -114,24 +114,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkLocationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        LOCATION_PERMISSION_REQUEST_CODE);
-            } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                showBackgroundLocationPermissionRationale();
-            } else {
-                startLocationServices();
-            }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.FOREGROUND_SERVICE_LOCATION
+                    },
+                    LOCATION_PERMISSION_REQUEST_CODE);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            showBackgroundLocationPermissionRationale();
         } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        LOCATION_PERMISSION_REQUEST_CODE);
-            } else {
-                startLocationServices();
-            }
+            startLocationServices();
         }
     }
 
@@ -310,18 +305,16 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            boolean allPermissionsGranted = true;
-            for (int result : grantResults) {
-                if (result != PackageManager.PERMISSION_GRANTED) {
-                    allPermissionsGranted = false;
-                    break;
+            if (grantResults.length > 1
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                    && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    showBackgroundLocationPermissionRationale();
+                } else {
+                    startLocationServices();
                 }
-            }
-
-            if (allPermissionsGranted) {
-                checkLocationPermission();
             } else {
-                Toast.makeText(this, "All permissions are necessary for the app to function properly", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Location permissions are necessary for the app to function properly", Toast.LENGTH_LONG).show();
             }
         } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -333,10 +326,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startLocationServices() {
-        Intent locationServiceIntent = new Intent(this, LocationUpdateService.class);
-        Intent parkingDetectionServiceIntent = new Intent(this, ParkingDetectionService.class);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                && (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
 
-        startForegroundService(locationServiceIntent);
-        startForegroundService(parkingDetectionServiceIntent);
+            Intent locationServiceIntent = new Intent(this, LocationUpdateService.class);
+            Intent parkingDetectionServiceIntent = new Intent(this, ParkingDetectionService.class);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(locationServiceIntent);
+                startForegroundService(parkingDetectionServiceIntent);
+            } else {
+                startService(locationServiceIntent);
+                startService(parkingDetectionServiceIntent);
+            }
+        } else {
+            checkLocationPermission();
+        }
     }
 }
