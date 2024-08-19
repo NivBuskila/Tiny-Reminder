@@ -527,6 +527,10 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             options.add("Remove Admin");
             options.add("Remove from Family");
         }
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null && member.getId().equals(currentUser.getUid())) {
+            options.add("Leave Family");
+        }
 
         String[] optionsArray = options.toArray(new String[0]);
 
@@ -545,10 +549,35 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                 case "Remove from Family":
                     removeMemberFromFamily(member);
                     break;
+                case "Leave Family": 
+                    leaveFamily(member);
+                    break;
             }
         });
         builder.show();
     }
+
+    private void leaveFamily(FamilyMember member) {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null || !currentUser.getUid().equals(member.getId())) return;
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Leave Family")
+                .setMessage("Are you sure you want to leave the family?")
+                .setPositiveButton("Yes", (dialog, which) -> {
+                    dbManager.removeUserFromFamily(member.getId(), currentFamilyId, task -> {
+                        if (task.isSuccessful()) {
+                            Toast.makeText(getContext(), "You have left the family", Toast.LENGTH_SHORT).show();
+                            navigateToProfileScreen();
+                        } else {
+                            Toast.makeText(getContext(), "Failed to leave the family", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                })
+                .setNegativeButton("No", null)
+                .show();
+    }
+
 
     private void makeAdmin(FamilyMember member) {
         if (currentFamilyId == null) return;
