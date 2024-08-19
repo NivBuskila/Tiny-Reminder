@@ -14,6 +14,7 @@
     import com.google.android.gms.tasks.OnCompleteListener;
     import com.google.android.gms.tasks.Task;
     import com.google.android.gms.tasks.Tasks;
+    import com.google.firebase.database.ChildEventListener;
     import com.google.firebase.database.DataSnapshot;
     import com.google.firebase.database.DatabaseError;
     import com.google.firebase.database.DatabaseReference;
@@ -154,13 +155,26 @@
             mDatabase.child("families").child(familyId).addListenerForSingleValueEvent(listener);
         }
 
-        public void getFamilyMembers(String familyId, final ValueEventListener listener) {
-            mDatabase.child("families").child(familyId).child("memberIds").addValueEventListener(listener);
+        public void getFamilyMembers(String familyId, ChildEventListener listener) {
+            mDatabase.child("families").child(familyId).child("memberIds").addChildEventListener(listener);
         }
 
-        public void getMemberData(String userId, final ValueEventListener listener) {
-            mDatabase.child("users").child(userId).addListenerForSingleValueEvent(listener);
+        public void getFamilyMembersWithValueEventListener(String familyId, ValueEventListener listener) {
+            mDatabase.child("families").child(familyId).child("memberIds").addListenerForSingleValueEvent(listener);
         }
+        public void getFamilyMembersWithChildEventListener(String familyId, ChildEventListener listener) {
+            mDatabase.child("families").child(familyId).child("memberIds").addChildEventListener(listener);
+        }
+
+        public void getMemberDataWithChildListener(String userId, ChildEventListener listener) {
+            mDatabase.child("users").child(userId).addChildEventListener(listener);
+        }
+
+
+        public void getMemberData(String userId, final ValueEventListener listener) {
+            mDatabase.child("users").child(userId).addValueEventListener(listener);
+        }
+
 
         public Task<Void> updateMemberLocation(String userId, String familyId, double latitude, double longitude) {
             Map<String, Object> locationUpdates = new HashMap<>();

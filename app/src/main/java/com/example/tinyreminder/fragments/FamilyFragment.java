@@ -31,6 +31,7 @@ import com.example.tinyreminder.utils.DatabaseManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.ValueEventListener;
@@ -125,6 +126,10 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                 if (user != null && user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
                     isUserInFamily = true;
                     currentFamilyId = user.getFamilyId();
+
+                    // Clear existing members list before fetching new data
+                    adapter.updateMembers(new ArrayList<>());
+
                     fetchFamilyMembers(currentFamilyId);
                     checkAdminStatus(currentUser.getUid(), currentFamilyId);
                 } else {
@@ -144,50 +149,141 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
 
+
     private void fetchFamilyMembers(String familyId) {
-        dbManager.getFamilyMembers(familyId, new ValueEventListener() {
+        dbManager.getFamilyMembersWithChildEventListener(familyId, new ChildEventListener() {
+            List<FamilyMember> members = new ArrayList<>();
+
             @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                List<FamilyMember> members = new ArrayList<>();
-                for (DataSnapshot memberSnapshot : dataSnapshot.getChildren()) {
-                    String memberId = memberSnapshot.getKey();
-                    if (memberId != null) {
-                        fetchMemberDetails(memberId, members);
-                    }
+            public void onChildAdded(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                String memberId = dataSnapshot.getKey();
+                if (memberId != null) {
+                    dbManager.getMemberData(memberId, new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                            User user = dataSnapshot.getValue(User.class);
+                            if (user != null) {
+                                updateOrAddMember(memberId, user, members);
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError databaseError) {
+                            Log.w(TAG, "getMemberData:onCancelled", databaseError.toException());
+                        }
+                    });
                 }
             }
 
             @Override
+            public void onChildChanged(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                String memberId = dataSnapshot.getKey();
+                if (memberId != null) {
+                    dbManager.getMemberData(memberId, new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                            User user = dataSnapshot.getValue(User.class);
+                            if (user != null) {
+                                updateMemberStatus(memberId, user.getStatus());
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError databaseError) {
+                            Log.w(TAG, "getMemberData:onCancelled", databaseError.toException());
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
+                // ניתן לטפל כאן בהסרה של חבר משפחה אם יש צורך
+            }
+
+            @Override
+            public void onChildMoved(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // ניתן לטפל כאן בהזזה של חבר משפחה אם יש צורך
+            }
+
+            @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-                Log.w(TAG, "loadFamilyMembers:onCancelled", databaseError.toException());
-                showNoMembersMessage();
+                Log.w(TAG, "fetchFamilyMembers:onCancelled", databaseError.toException());
             }
         });
     }
+
+
+
+
+    private void updateOrAddMember(String memberId, User user, List<FamilyMember> members) {
+        FamilyMember memberToUpdate = null;
+
+        for (FamilyMember member : members) {
+            if (member.getId().equals(memberId)) {
+                memberToUpdate = member;
+                break;
+            }
+        }
+
+        if (memberToUpdate != null) {
+            memberToUpdate.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
+            memberToUpdate.setProfilePictureUrl(user.getProfilePictureUrl());
+        } else {
+            FamilyMember newMember = new FamilyMember(user.getId(), user.getName(), "Member"); // או תפקיד מתאים אחר
+            newMember.setProfilePictureUrl(user.getProfilePictureUrl());
+            newMember.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
+            members.add(newMember);
+        }
+
+        adapter.updateMembers(members);
+    }
+
+    private void updateMemberStatus(String memberId, String newStatus) {
+        for (int i = 0; i < adapter.getMembers().size(); i++) {
+            FamilyMember member = adapter.getMembers().get(i);
+            if (member.getId().equals(memberId)) {
+                member.setResponseStatus(convertStatusToResponseStatus(newStatus));
+                adapter.notifyItemChanged(i);
+                break;
+            }
+        }
+    }
+
+
     private void fetchMemberDetails(String memberId, final List<FamilyMember> members) {
         dbManager.getMemberData(memberId, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
                 if (user != null) {
-                    dbManager.checkIfUserIsAdmin(user.getId(), currentFamilyId, new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot adminSnapshot) {
-                            boolean isAdmin = adminSnapshot.exists() && adminSnapshot.getValue(Boolean.class);
-                            String role = isAdmin ? "Manager" : "Member";
-                            FamilyMember member = new FamilyMember(user.getId(), user.getName(), role);
-                            member.setProfilePictureUrl(user.getProfilePictureUrl());
-                            member.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
-
-                            members.add(member);
-                            updateUI(members);
+                    boolean alreadyExists = false;
+                    for (FamilyMember member : members) {
+                        if (member.getId().equals(memberId)) {
+                            alreadyExists = true;
+                            break;
                         }
+                    }
+                    if (!alreadyExists) {
+                        dbManager.checkIfUserIsAdmin(user.getId(), currentFamilyId, new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot adminSnapshot) {
+                                boolean isAdmin = adminSnapshot.exists() && adminSnapshot.getValue(Boolean.class);
+                                String role = isAdmin ? "Manager" : "Member";
+                                FamilyMember member = new FamilyMember(user.getId(), user.getName(), role);
+                                member.setProfilePictureUrl(user.getProfilePictureUrl());
+                                member.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
 
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError databaseError) {
-                            Log.w(TAG, "checkIfUserIsAdmin:onCancelled", databaseError.toException());
-                        }
-                    });
+                                members.add(member);
+                                updateUI(members);
+                            }
+
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError databaseError) {
+                                Log.w(TAG, "checkIfUserIsAdmin:onCancelled", databaseError.toException());
+                            }
+                        });
+                    }
                 }
             }
 
@@ -218,6 +314,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                 showNoMembersMessage();
             } else {
                 adapter.updateMembers(members);
+                adapter.notifyDataSetChanged();
                 familyMembersList.setVisibility(View.VISIBLE);
                 noMembersTextView.setVisibility(View.GONE);
             }
@@ -354,28 +451,58 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void checkAndDeleteEmptyFamily() {
-        dbManager.getFamilyMembers(currentFamilyId, new ValueEventListener() {
+        dbManager.getFamilyMembersWithChildEventListener(currentFamilyId, new ChildEventListener() {
             @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                if (!dataSnapshot.exists() || dataSnapshot.getChildrenCount() == 0) {
-                    // Family has no members, delete it
-                    dbManager.deleteFamily(currentFamilyId, task -> {
-                        if (task.isSuccessful()) {
-                            Toast.makeText(getContext(), "Family deleted as it has no members left", Toast.LENGTH_SHORT).show();
-                            navigateToProfileScreen();
-                        } else {
-                            Toast.makeText(getContext(), "Failed to delete empty family", Toast.LENGTH_SHORT).show();
-                        }
-                    });
+            public void onChildAdded(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // אם יש חברי משפחה, לא צריך למחוק את המשפחה
+                if (dataSnapshot.exists()) {
+                    return;
                 }
             }
 
             @Override
+            public void onChildChanged(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // לא דרוש שינוי לוגיקה במקרה הזה
+            }
+
+            @Override
+            public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
+                // אם חבר משפחה נמחק ויש צורך לבדוק אם המשפחה ריקה
+                dbManager.getFamilyMembersWithValueEventListener(currentFamilyId, new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        if (!dataSnapshot.exists() || dataSnapshot.getChildrenCount() == 0) {
+                            // אין חברי משפחה, אז יש למחוק את המשפחה
+                            dbManager.deleteFamily(currentFamilyId, task -> {
+                                if (task.isSuccessful()) {
+                                    Toast.makeText(getContext(), "Family deleted as it has no members left", Toast.LENGTH_SHORT).show();
+                                    navigateToProfileScreen();
+                                } else {
+                                    Toast.makeText(getContext(), "Failed to delete empty family", Toast.LENGTH_SHORT).show();
+                                }
+                            });
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        Log.w(TAG, "checkAndDeleteEmptyFamily:onCancelled", databaseError.toException());
+                    }
+                });
+            }
+
+            @Override
+            public void onChildMoved(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
+                // לא דרוש שינוי לוגיקה במקרה הזה
+            }
+
+            @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-                Log.w(TAG, "checkAndDeleteEmptyFamily:onCancelled", databaseError.toException());
+                Log.w(TAG, "getFamilyMembers:onCancelled", databaseError.toException());
             }
         });
     }
+
 
     private void navigateToProfileScreen() {
         if (getActivity() instanceof MainActivity) {

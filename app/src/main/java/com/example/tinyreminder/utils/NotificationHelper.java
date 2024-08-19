@@ -99,7 +99,7 @@ public class NotificationHelper {
 
     public static void sendFamilyNotificationExceptUser(Context context, String familyId, String excludeUserId) {
         DatabaseManager dbManager = new DatabaseManager(context);
-        dbManager.getFamilyMembers(familyId, new ValueEventListener() {
+        dbManager.getFamilyMembersWithValueEventListener(familyId, new ValueEventListener() { // שינוי כאן
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 for (DataSnapshot memberSnapshot : dataSnapshot.getChildren()) {
@@ -117,6 +117,7 @@ public class NotificationHelper {
             }
         });
     }
+
 
     public static void sendNotificationToMember(Context context, String memberId, String title, String message) {
         DatabaseManager dbManager = new DatabaseManager(context);
