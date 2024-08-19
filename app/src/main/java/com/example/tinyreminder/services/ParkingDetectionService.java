@@ -13,11 +13,14 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import com.example.tinyreminder.MainActivity;
 import com.example.tinyreminder.R;
+import com.example.tinyreminder.models.ParkingEvent;
+import com.example.tinyreminder.utils.DatabaseManager;
 import com.example.tinyreminder.utils.NotificationHelper;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -27,7 +30,7 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
 import com.google.firebase.auth.FirebaseAuth;
 
-    public class ParkingDetectionService extends Service {
+public class ParkingDetectionService extends Service {
     private static final String TAG = "ParkingDetectionService";
     private static final float DRIVING_SPEED_THRESHOLD = 15f; // km/h
     private static final float PARKING_SPEED_THRESHOLD = 5f; // km/h
@@ -51,10 +54,14 @@ import com.google.firebase.auth.FirebaseAuth;
     private long stationaryStartTime;
     private float lastSpeed = 0f;
 
+    private DatabaseManager dbManager;
+
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d(TAG, "ParkingDetectionService onCreate called");
         createNotificationChannel();
+        dbManager = new DatabaseManager();
         Notification notification = buildNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
@@ -65,18 +72,16 @@ import com.google.firebase.auth.FirebaseAuth;
         startLocationUpdates();
     }
 
-
     private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel serviceChannel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Location Service Channel",
-                    NotificationManager.IMPORTANCE_DEFAULT
-            );
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            manager.createNotificationChannel(serviceChannel);
-        }
+        NotificationChannel serviceChannel = new NotificationChannel(
+                CHANNEL_ID,
+                "Location Service Channel",
+                NotificationManager.IMPORTANCE_DEFAULT
+        );
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        manager.createNotificationChannel(serviceChannel);
     }
+
     private Notification buildNotification() {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
@@ -92,7 +97,7 @@ import com.google.firebase.auth.FirebaseAuth;
     private void createLocationCallback() {
         locationCallback = new LocationCallback() {
             @Override
-            public void onLocationResult(LocationResult locationResult) {
+            public void onLocationResult(@NonNull LocationResult locationResult) {
                 if (locationResult == null) {
                     return;
                 }
@@ -170,13 +175,28 @@ import com.google.firebase.auth.FirebaseAuth;
     private void sendParkingNotification() {
         String userId = getCurrentUserId();
         if (userId != null) {
-            Log.d(TAG, "Sending parking notification for user: " + userId);
-            NotificationHelper.sendParkingNotification(this, userId);
+            Log.d(TAG, "Creating parking event for user: " + userId);
+            ParkingEvent parkingEvent = new ParkingEvent(userId, System.currentTimeMillis(), lastLocation.getLatitude(), lastLocation.getLongitude());
+            dbManager.createParkingEvent(parkingEvent, task -> {
+                if (task.isSuccessful()) {
+                    Log.d(TAG, "Parking event created successfully");
+                    // Update user status to PENDING
+                    dbManager.setUserStatus(userId, "PENDING").addOnCompleteListener(statusTask -> {
+                        if (statusTask.isSuccessful()) {
+                            Log.d(TAG, "User status updated to PENDING");
+                            NotificationHelper.sendParkingNotification(this, userId, parkingEvent.getId());
+                        } else {
+                            Log.e(TAG, "Failed to update user status", statusTask.getException());
+                        }
+                    });
+                } else {
+                    Log.e(TAG, "Failed to create parking event", task.getException());
+                }
+            });
         } else {
-            Log.e(TAG, "Failed to send notification: User ID is null");
+            Log.e(TAG, "Failed to create parking event: User ID is null");
         }
     }
-
 
     private String getCurrentUserId() {
         FirebaseAuth auth = FirebaseAuth.getInstance();

@@ -1,5 +1,10 @@
 package com.example.tinyreminder.fragments;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.util.Log;
@@ -35,7 +40,7 @@ import java.util.List;
 
 public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMemberClickListener {
     private static final String TAG = "FamilyFragment";
-
+    private BroadcastReceiver statusChangeReceiver;
     private RecyclerView familyMembersList;
     private FamilyMemberAdapter adapter;
     private DatabaseManager dbManager;
@@ -49,6 +54,32 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        statusChangeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                loadFamilyMembers();
+            }
+        };
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        IntentFilter filter = new IntentFilter("com.example.tinyreminder.FAMILY_STATUS_CHANGED");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requireActivity().registerReceiver(statusChangeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            requireActivity().registerReceiver(statusChangeReceiver, filter);
+        }
+        loadFamilyMembers();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (statusChangeReceiver != null) {
+            requireActivity().unregisterReceiver(statusChangeReceiver);
+        }
     }
 
     @Override
@@ -112,6 +143,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         });
     }
 
+
     private void fetchFamilyMembers(String familyId) {
         dbManager.getFamilyMembers(familyId, new ValueEventListener() {
             @Override
@@ -132,7 +164,6 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
             }
         });
     }
-
     private void fetchMemberDetails(String memberId, final List<FamilyMember> members) {
         dbManager.getMemberData(memberId, new ValueEventListener() {
             @Override
@@ -146,8 +177,6 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                             String role = isAdmin ? "Manager" : "Member";
                             FamilyMember member = new FamilyMember(user.getId(), user.getName(), role);
                             member.setProfilePictureUrl(user.getProfilePictureUrl());
-
-                            // Update member status
                             member.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
 
                             members.add(member);
@@ -177,19 +206,23 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         } else if ("ALERT".equals(status)) {
             return FamilyMember.ResponseStatus.ALERT;
         }
-        return FamilyMember.ResponseStatus.PENDING; // Default if status is unknown
+        return FamilyMember.ResponseStatus.OK; // Default if status is unknown
     }
 
 
     private void updateUI(List<FamilyMember> members) {
-        if (members.isEmpty()) {
-            showNoMembersMessage();
-        } else {
-            adapter.updateMembers(members);
-            familyMembersList.setVisibility(View.VISIBLE);
-            noMembersTextView.setVisibility(View.GONE);
-        }
-        updateUIForAdminStatus();
+        if (getActivity() == null) return;
+
+        getActivity().runOnUiThread(() -> {
+            if (members.isEmpty()) {
+                showNoMembersMessage();
+            } else {
+                adapter.updateMembers(members);
+                familyMembersList.setVisibility(View.VISIBLE);
+                noMembersTextView.setVisibility(View.GONE);
+            }
+            updateUIForAdminStatus();
+        });
     }
 
     private void showNoMembersMessage() {

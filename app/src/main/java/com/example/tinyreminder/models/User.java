@@ -15,6 +15,7 @@
         private double longitude;
         private Map<String, Object> avatar;
         private String status;
+        private boolean isAlerted;
 
         private String profilePictureUrl;
         private String fcmToken;
@@ -42,7 +43,13 @@
             this.latitude = latitude;
             this.longitude = longitude;
         }
+        public boolean isAlerted() {
+            return isAlerted;
+        }
 
+        public void setAlerted(boolean alerted) {
+            isAlerted = alerted;
+        }
         public boolean hasPhoneNumber() {
             return phoneNumber != null && !phoneNumber.isEmpty();
         }
@@ -160,6 +167,7 @@
             result.put("familyId", familyId);
             result.put("profilePictureUrl", profilePictureUrl);
             result.put("status", status);
+            result.put("isAlerted", isAlerted);
             return result;
         }
 
