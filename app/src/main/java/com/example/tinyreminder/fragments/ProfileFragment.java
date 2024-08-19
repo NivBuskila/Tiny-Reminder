@@ -45,7 +45,7 @@ public class ProfileFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         Log.d(TAG, "ProfileFragment: onCreateView");
         View view = inflater.inflate(R.layout.fragment_profile, container, false);
-        initializeViews(view);
+        initializeViews(view); // Initialize UI elements
         return view;
     }
 
@@ -53,24 +53,26 @@ public class ProfileFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "ProfileFragment: onCreate");
-        dbManager = new DatabaseManager(requireContext());
-        mAuth = FirebaseAuth.getInstance();
+        dbManager = new DatabaseManager(requireContext()); // Initialize DatabaseManager
+        mAuth = FirebaseAuth.getInstance(); // Get FirebaseAuth instance
     }
+
     @Override
     public void onResume() {
         super.onResume();
         Log.d(TAG, "ProfileFragment: onResume");
-        loadUserData();
+        loadUserData(); // Load user data when the fragment is resumed
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         Log.d(TAG, "ProfileFragment: onViewCreated");
-        setupListeners();
-        loadUserData();
+        setupListeners(); // Set up button click listeners
+        loadUserData(); // Load user data when the view is created
     }
 
+    // Method to initialize views in the fragment
     private void initializeViews(View view) {
         profileImage = view.findViewById(R.id.profile_image);
         profileName = view.findViewById(R.id.profile_name);
@@ -84,6 +86,7 @@ public class ProfileFragment extends Fragment {
         logoutButton = view.findViewById(R.id.logout_button);
     }
 
+    // Method to set up listeners for button clicks
     private void setupListeners() {
         editProfileButton.setOnClickListener(v -> navigateToEditProfile());
         familyButton.setOnClickListener(v -> navigateToFamilyScreen());
@@ -91,6 +94,7 @@ public class ProfileFragment extends Fragment {
         logoutButton.setOnClickListener(v -> signOut());
     }
 
+    // Method to load user data from Firebase
     private void loadUserData() {
         FirebaseUser firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
         if (firebaseUser != null) {
@@ -104,15 +108,15 @@ public class ProfileFragment extends Fragment {
                         user.setId(userId);
                         currentUser = user;
                         Log.d(TAG, "User data loaded successfully: " + user.toString());
-                        updateUIWithUserData(user);
+                        updateUIWithUserData(user); // Update UI with the loaded user data
                         if (user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
-                            loadFamilyData(user.getFamilyId());
+                            loadFamilyData(user.getFamilyId()); // Load family data if the user has a family
                         } else {
-                            showCreateJoinFamilyButton();
+                            showCreateJoinFamilyButton(); // Show the button to create or join a family
                         }
                     } else {
                         Log.e(TAG, "User data is null");
-                        createUserDataIfNotExists(firebaseUser);
+                        createUserDataIfNotExists(firebaseUser); // Create user data if it doesn't exist
                     }
                 }
 
@@ -128,6 +132,7 @@ public class ProfileFragment extends Fragment {
         }
     }
 
+    // Method to create user data in the database if it doesn't exist
     private void createUserDataIfNotExists(FirebaseUser firebaseUser) {
         User newUser = new User(
                 firebaseUser.getUid(),
@@ -139,7 +144,7 @@ public class ProfileFragment extends Fragment {
             if (task.isSuccessful()) {
                 Log.d(TAG, "User data created successfully");
                 currentUser = newUser;
-                updateUIWithUserData(newUser);
+                updateUIWithUserData(newUser); // Update UI with the newly created user data
             } else {
                 Log.e(TAG, "Failed to create user data", task.getException());
                 Toast.makeText(getContext(), "Failed to create user data", Toast.LENGTH_SHORT).show();
@@ -147,10 +152,11 @@ public class ProfileFragment extends Fragment {
         });
     }
 
+    // Method to load family data from the database
     private void loadFamilyData(String familyId) {
         if (familyId == null || familyId.isEmpty()) {
             Log.e(TAG, "Family ID is null or empty");
-            showCreateJoinFamilyButton();
+            showCreateJoinFamilyButton(); // Show the button to create or join a family
             return;
         }
 
@@ -159,10 +165,10 @@ public class ProfileFragment extends Fragment {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 Family family = snapshot.getValue(Family.class);
                 if (family != null) {
-                    updateUIWithFamilyData(family);
+                    updateUIWithFamilyData(family); // Update UI with the loaded family data
                 } else {
                     Log.e(TAG, "Family data is null");
-                    showCreateJoinFamilyButton();
+                    showCreateJoinFamilyButton(); // Show the button to create or join a family
                 }
             }
 
@@ -170,11 +176,12 @@ public class ProfileFragment extends Fragment {
             public void onCancelled(@NonNull DatabaseError error) {
                 Log.e(TAG, "Failed to load family data: " + error.getMessage());
                 Toast.makeText(getContext(), "Failed to load family data", Toast.LENGTH_SHORT).show();
-                showCreateJoinFamilyButton();
+                showCreateJoinFamilyButton(); // Show the button to create or join a family
             }
         });
     }
 
+    // Method to update the UI with user data
     private void updateUIWithUserData(User user) {
         if (user == null) {
             Log.e(TAG, "User object is null");
@@ -194,16 +201,18 @@ public class ProfileFragment extends Fragment {
         }
 
         if (user.getProfilePictureUrl() != null && !user.getProfilePictureUrl().isEmpty()) {
+            // Load the user's profile picture using Glide
             Glide.with(this)
                     .load(user.getProfilePictureUrl())
                     .circleCrop()
                     .into(profileImage);
         } else {
-            loadAndDisplayAvatar(userId, user.getName());
+            loadAndDisplayAvatar(userId, user.getName()); // Load and display avatar if no profile picture
         }
-        updatePhoneNumberRelatedUI(user.hasPhoneNumber());
+        updatePhoneNumberRelatedUI(user.hasPhoneNumber()); // Update UI elements related to phone number
     }
 
+    // Method to load and display the user's avatar
     private void loadAndDisplayAvatar(String userId, String name) {
         Log.d(TAG, "Loading avatar for user: " + userId + ", name: " + name);
         AvatarUtils.loadAvatarData(userId, name, (initials, color) -> {
@@ -217,26 +226,31 @@ public class ProfileFragment extends Fragment {
         });
     }
 
+    // Method to update the UI with family data
     private void updateUIWithFamilyData(Family family) {
         familyName.setText(getString(R.string.family_name, family.getName()));
         familyCode.setText(getString(R.string.family_code, family.getId()));
         familyButton.setVisibility(View.VISIBLE);
-        createJoinFamilyButton.setVisibility(View.GONE);
+        createJoinFamilyButton.setVisibility(View.GONE); // Hide the create/join button if family data is loaded
     }
 
+    // Method to show the button to create or join a family
     private void showCreateJoinFamilyButton() {
         familyButton.setVisibility(View.GONE);
         createJoinFamilyButton.setVisibility(View.VISIBLE);
     }
 
+    // Navigation method to edit profile screen
     private void navigateToEditProfile() {
         ((MainActivity) requireActivity()).loadFragment(new EditProfileFragment());
     }
 
+    // Navigation method to family screen
     private void navigateToFamilyScreen() {
         ((MainActivity) requireActivity()).loadFragment(new FamilyFragment());
     }
 
+    // Show a dialog for selecting family creation or joining
     private void showFamilySelectionDialog() {
         if (currentUser != null && currentUser.hasPhoneNumber()) {
             AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -247,10 +261,11 @@ public class ProfileFragment extends Fragment {
                     .setCancelable(false)
                     .show();
         } else {
-            showPhoneNumberRequiredDialog();
+            showPhoneNumberRequiredDialog(); // Prompt to add phone number if none exists
         }
     }
 
+    // Show a dialog indicating that a phone number is required
     private void showPhoneNumberRequiredDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Phone Number Required")
@@ -260,6 +275,7 @@ public class ProfileFragment extends Fragment {
                 .show();
     }
 
+    // Method to handle creating a new family
     private void createNewFamily() {
         if (currentUser != null && currentUser.hasPhoneNumber()) {
             AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -277,7 +293,7 @@ public class ProfileFragment extends Fragment {
                             if (task.isSuccessful()) {
                                 String familyId = task.getResult();
                                 Toast.makeText(getContext(), "Family created successfully", Toast.LENGTH_SHORT).show();
-                                loadUserData();
+                                loadUserData(); // Reload user data after creating a family
                             } else {
                                 Toast.makeText(getContext(), "Failed to create family: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
                             }
@@ -290,10 +306,11 @@ public class ProfileFragment extends Fragment {
             builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
             builder.show();
         } else {
-            showPhoneNumberRequiredDialog();
+            showPhoneNumberRequiredDialog(); // Prompt to add phone number if none exists
         }
     }
 
+    // Method to show a dialog for joining an existing family
     private void showJoinFamilyDialog() {
         if (currentUser != null && currentUser.hasPhoneNumber()) {
             AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -313,10 +330,11 @@ public class ProfileFragment extends Fragment {
             builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
             builder.show();
         } else {
-            showPhoneNumberRequiredDialog();
+            showPhoneNumberRequiredDialog(); // Prompt to add phone number if none exists
         }
     }
 
+    // Method to handle joining an existing family
     private void joinFamily(String familyId) {
         FirebaseUser currentFirebaseUser = mAuth.getCurrentUser();
         if (currentFirebaseUser != null) {
@@ -328,7 +346,7 @@ public class ProfileFragment extends Fragment {
                         dbManager.addUserToFamily(currentFirebaseUser.getUid(), familyId, task -> {
                             if (task.isSuccessful()) {
                                 Toast.makeText(getContext(), "Joined family successfully", Toast.LENGTH_SHORT).show();
-                                loadUserData();
+                                loadUserData(); // Reload user data after joining a family
                             } else {
                                 Toast.makeText(getContext(), "Failed to join family", Toast.LENGTH_SHORT).show();
                             }
@@ -347,18 +365,20 @@ public class ProfileFragment extends Fragment {
         }
     }
 
+    // Method to update UI elements related to the phone number
     private void updatePhoneNumberRelatedUI(boolean hasPhoneNumber) {
         if (hasPhoneNumber) {
             createJoinFamilyButton.setEnabled(true);
-            // You might want to show a message that the user can now create or join a family
+            // Optionally show a message that the user can now create or join a family
         } else {
             createJoinFamilyButton.setEnabled(false);
-            // You might want to show a message that the user needs to add a phone number
+            // Optionally show a message that the user needs to add a phone number
         }
     }
 
+    // Method to sign out the current user
     private void signOut() {
         mAuth.signOut();
-        ((MainActivity) requireActivity()).navigateToLogin();
+        ((MainActivity) requireActivity()).navigateToLogin(); // Navigate to the login screen after sign out
     }
 }

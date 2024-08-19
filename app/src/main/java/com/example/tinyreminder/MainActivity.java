@@ -57,19 +57,22 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         dbManager = new DatabaseManager(this);
 
-        createNotificationChannel();
-        setupFirebaseMessaging();
-        checkNotificationPermission();
-        checkLocationPermission();
+        createNotificationChannel(); // Create notification channel for Android O and above
+        setupFirebaseMessaging(); // Set up Firebase Messaging to retrieve FCM token
+        checkNotificationPermission(); // Check and request notification permissions
+        checkLocationPermission(); // Check and request location permissions
 
-        setupBottomNavigation();
-        setupBackPressedCallback();
-        setupAuthStateListener();
-        checkUserAuthState();
+        setupBottomNavigation(); // Set up bottom navigation view
+        setupBackPressedCallback(); // Set up custom back press behavior
+        setupAuthStateListener(); // Set up authentication state listener
+        checkUserAuthState(); // Check if the user is signed in and navigate accordingly
 
-        handleNotificationIntent(getIntent());
+        handleNotificationIntent(getIntent()); // Handle intent received when the activity is started via a notification
     }
 
+    /**
+     * Creates a notification channel required for notifications on Android O and above.
+     */
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -81,6 +84,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Sets up Firebase Messaging to retrieve the FCM token.
+     */
     private void setupFirebaseMessaging() {
         FirebaseMessaging.getInstance().getToken()
                 .addOnCompleteListener(task -> {
@@ -89,11 +95,14 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
                     String token = task.getResult();
-                    saveTokenToDatabase(token);
+                    saveTokenToDatabase(token); // Save the FCM token to the database
                     Log.d(TAG, "FCM Token: " + token);
                 });
     }
 
+    /**
+     * Saves the FCM token to the Firebase Realtime Database under the current user's profile.
+     */
     private void saveTokenToDatabase(String token) {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
@@ -102,6 +111,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Checks if the app has notification permissions. If not, requests them.
+     */
     private void checkNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -113,6 +125,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Checks if the app has location permissions. If not, requests them.
+     */
     private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -125,12 +140,15 @@ public class MainActivity extends AppCompatActivity {
                     LOCATION_PERMISSION_REQUEST_CODE);
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            showBackgroundLocationPermissionRationale();
+            showBackgroundLocationPermissionRationale(); // Show rationale for background location access
         } else {
-            startLocationServices();
+            startLocationServices(); // Start location services if all permissions are granted
         }
     }
 
+    /**
+     * Displays a dialog to explain why background location access is needed.
+     */
     private void showBackgroundLocationPermissionRationale() {
         new AlertDialog.Builder(this)
                 .setTitle("Background Location Access")
@@ -147,6 +165,9 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+    /**
+     * Sets up the bottom navigation view and its item selection handling.
+     */
     private void setupBottomNavigation() {
         bottomNavigationView = findViewById(R.id.bottom_navigation);
         bottomNavigationView.setOnItemSelectedListener(item -> {
@@ -165,37 +186,47 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (selectedFragment != null) {
-                loadFragment(selectedFragment);
+                loadFragment(selectedFragment); // Load the selected fragment
             }
             return true;
         });
     }
 
+    /**
+     * Sets up the behavior for the back button press.
+     * If there are fragments in the back stack, it pops the back stack. Otherwise, it finishes the activity.
+     */
     private void setupBackPressedCallback() {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
                 if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-                    getSupportFragmentManager().popBackStack();
+                    getSupportFragmentManager().popBackStack(); // Go back to the previous fragment
                 } else {
-                    finish();
+                    finish(); // Exit the app
                 }
             }
         });
     }
 
+    /**
+     * Sets up a listener to monitor the authentication state of the user.
+     */
     private void setupAuthStateListener() {
         mAuthListener = firebaseAuth -> {
             FirebaseUser user = firebaseAuth.getCurrentUser();
             Log.d(TAG, "onAuthStateChanged: " + (user != null ? user.getUid() : "null"));
             if (user != null) {
-                navigateToProfile();
+                navigateToProfile(); // If user is signed in, navigate to profile
             } else {
-                navigateToLogin();
+                navigateToLogin(); // If user is not signed in, navigate to login
             }
         };
     }
 
+    /**
+     * Checks the current authentication state of the user and navigates accordingly.
+     */
     private void checkUserAuthState() {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
@@ -207,34 +238,43 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Loads the specified fragment into the fragment container.
+     */
     public void loadFragment(Fragment fragment) {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
         fragmentTransaction.replace(R.id.fragment_container, fragment);
-        fragmentTransaction.addToBackStack(null);
-        fragmentTransaction.commit();
+        fragmentTransaction.addToBackStack(null); // Add the transaction to the back stack
+        fragmentTransaction.commit(); // Commit the transaction
     }
 
+    /**
+     * Navigates to the login screen.
+     */
     public void navigateToLogin() {
         Log.d(TAG, "Navigating to login");
         loadFragment(new LoginFragment());
-        bottomNavigationView.setVisibility(View.GONE);
+        bottomNavigationView.setVisibility(View.GONE); // Hide bottom navigation on the login screen
     }
 
+    /**
+     * Navigates to the profile screen.
+     */
     public void navigateToProfile() {
         Log.d(TAG, "MainActivity: navigateToProfile called");
         Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
 
         if (currentFragment instanceof ProfileFragment) {
             Log.d(TAG, "MainActivity: ProfileFragment is already displayed");
-            return;
+            return; // If already on ProfileFragment, do nothing
         }
 
         Fragment profileFragment = new ProfileFragment();
         loadFragment(profileFragment);
         Log.d(TAG, "MainActivity: after loadFragment call");
 
-        bottomNavigationView.setVisibility(View.VISIBLE);
+        bottomNavigationView.setVisibility(View.VISIBLE); // Show bottom navigation on the profile screen
         bottomNavigationView.setSelectedItemId(R.id.navigation_profile);
     }
 
@@ -242,24 +282,28 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         Log.d(TAG, "MainActivity: onStart");
-        mAuth.addAuthStateListener(mAuthListener);
-        checkUserAuthState();
+        mAuth.addAuthStateListener(mAuthListener); // Add auth state listener on start
+        checkUserAuthState(); // Check auth state again in case it has changed
     }
 
     @Override
     protected void onStop() {
         super.onStop();
         if (mAuthListener != null) {
-            mAuth.removeAuthStateListener(mAuthListener);
+            mAuth.removeAuthStateListener(mAuthListener); // Remove auth state listener on stop
         }
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        handleNotificationIntent(intent);
+        handleNotificationIntent(intent); // Handle the intent received when the activity is brought to the foreground via a notification
     }
 
+    /**
+     * Handles the intent received when the activity is started via a notification.
+     * If the intent contains an eventId, shows the corresponding parking event dialog.
+     */
     private void handleNotificationIntent(Intent intent) {
         if (intent.hasExtra("eventId")) {
             String eventId = intent.getStringExtra("eventId");
@@ -267,6 +311,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Shows a dialog to confirm if a child is still in the car, based on a parking event.
+     */
     private void showParkingEventDialog(String eventId) {
         dbManager.getParkingEvent(eventId, new ValueEventListener() {
             @Override
@@ -290,7 +337,7 @@ public class MainActivity extends AppCompatActivity {
                             }
                         });
                     });
-                    builder.show();
+                    builder.show(); // Show the dialog
                 }
             }
 
@@ -310,22 +357,25 @@ public class MainActivity extends AppCompatActivity {
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED
                     && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    showBackgroundLocationPermissionRationale();
+                    showBackgroundLocationPermissionRationale(); // Show rationale for background location access if on Android Q or later
                 } else {
-                    startLocationServices();
+                    startLocationServices(); // Start location services if all permissions are granted
                 }
             } else {
                 Toast.makeText(this, "Location permissions are necessary for the app to function properly", Toast.LENGTH_LONG).show();
             }
         } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startLocationServices();
+                startLocationServices(); // Start location services if background location permission is granted
             } else {
                 Toast.makeText(this, "Background location permission is required for continuous tracking", Toast.LENGTH_LONG).show();
             }
         }
     }
 
+    /**
+     * Starts the location update services if all necessary permissions are granted.
+     */
     private void startLocationServices() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -343,7 +393,7 @@ public class MainActivity extends AppCompatActivity {
                 startService(parkingDetectionServiceIntent);
             }
         } else {
-            checkLocationPermission();
+            checkLocationPermission(); // Recheck location permissions if not all are granted
         }
     }
 }

@@ -80,6 +80,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private LocationCallback locationCallback;
     private FloatingActionButton btnMyLocation;
 
+    // Static method to create a new instance of MapFragment with a member ID
     public static MapFragment newInstance(String memberId) {
         MapFragment fragment = new MapFragment();
         Bundle args = new Bundle();
@@ -87,6 +88,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         fragment.setArguments(args);
         return fragment;
     }
+
+    // Overloaded static method to create a new instance with navigation info
     public static MapFragment newInstance(boolean fromBottomNav, String memberId) {
         MapFragment fragment = new MapFragment();
         Bundle args = new Bundle();
@@ -95,6 +98,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         fragment.setArguments(args);
         return fragment;
     }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -111,7 +115,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
         dbManager = new DatabaseManager(requireContext());
 
-        // קבל את ה-familyId של המשתמש הנוכחי
+        // Fetch the current user's family ID
         dbManager.getUserData(memberId, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -138,8 +142,11 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         Log.d(TAG, "onCreateView: Creating view for MapFragment");
         View view = inflater.inflate(R.layout.fragment_map, container, false);
 
+        // Initialize and set up the My Location button
         btnMyLocation = view.findViewById(R.id.btn_my_location);
         btnMyLocation.setOnClickListener(v -> zoomToCurrentUser());
+
+        // Set up the map fragment
         SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager()
                 .findFragmentById(R.id.map);
         if (mapFragment != null) {
@@ -150,8 +157,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
         return view;
     }
-
-
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -165,6 +170,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    // Method to zoom the map to the current user's location
     private void zoomToCurrentUser() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
@@ -177,6 +183,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    // Method to configure the map's settings
     private void setupMapSettings() {
         if (map != null) {
             Log.d(TAG, "setupMapSettings: Configuring map settings");
@@ -189,6 +196,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    // Method to add a marker for the current user's location
     private void addCurrentUserMarker(LatLng location) {
         FirebaseAuth auth = FirebaseAuth.getInstance();
         FirebaseUser currentUser = auth.getCurrentUser();
@@ -211,6 +219,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
+    // Method to enable the My Location feature on the map
     private void enableMyLocation() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
@@ -256,6 +265,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    // Handle the result of the location permission request
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
@@ -269,6 +279,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    // Set up a listener for location updates based on the member ID
     private void setupLocationListener() {
         if (memberId == null || memberId.isEmpty()) {
             Log.e(TAG, "setupLocationListener: Member ID is null or empty");
@@ -302,6 +313,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
+    // Focus the map on the selected family member's marker
     private void focusOnMember(String memberId) {
         Marker marker = markers.get(memberId);
         if (marker != null) {
@@ -311,8 +323,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             Log.w(TAG, "focusOnMember: Marker not found for member ID: " + memberId);
         }
     }
-
     private void setupRealtimeFamilyLocationUpdates(String familyId) {
+        // Listen for real-time location updates for all family members
         dbManager.getRealtimeLocationsForFamily(familyId, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -325,7 +337,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                         updateMemberMarker(memberId, newLocation);
                     }
                 }
-
             }
 
             @Override
@@ -335,20 +346,21 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
-
     private float distanceBetween(LatLng point1, LatLng point2) {
+        // Calculate the distance in meters between two LatLng points
         float[] results = new float[1];
         Location.distanceBetween(point1.latitude, point1.longitude, point2.latitude, point2.longitude, results);
         return results[0];
     }
 
     private void showNoFamilyMessage() {
+        // Display a message if the user is not part of a family
         Toast.makeText(getContext(), "You are not part of a family. Please join or create a family first.", Toast.LENGTH_LONG).show();
     }
 
-
     private void updateMemberMarker(String memberId, LatLng location) {
         Log.d(TAG, "updateMemberMarker: Updating marker for member: " + memberId);
+        // Fetch user data and update the marker if the user belongs to the current family
         dbManager.getUserData(memberId, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -359,7 +371,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                     LatLng lastKnownLocation = markers.containsKey(memberId) ? markers.get(memberId).getPosition() : null;
                     if (lastKnownLocation == null || distanceBetween(lastKnownLocation, location) > MIN_DISTANCE_FOR_UPDATE) {
                         createOrUpdateMarker(user, location);
-
                     }
                 } else {
                     Log.d(TAG, "onDataChange: User does not belong to the same family. Skipping update for member: " + memberId);
@@ -373,9 +384,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
-
     private void createOrUpdateMarker(User user, LatLng location) {
         Log.d(TAG, "createOrUpdateMarker: Creating/Updating marker for user: " + user.getId());
+        // Create or update the marker based on the user's profile picture or avatar
         if (user.getProfilePictureUrl() != null && !user.getProfilePictureUrl().isEmpty()) {
             Log.d(TAG, "createOrUpdateMarker: Loading profile picture for user: " + user.getId());
             Glide.with(this)
@@ -414,6 +425,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     private Bitmap createMarkerBitmapFromProfile(Bitmap profile) {
         Log.d(TAG, "createMarkerBitmapFromProfile: Creating marker bitmap");
+        // Create a bitmap for the marker, including a background and profile image
         Bitmap background = Bitmap.createBitmap(MARKER_SIZE, MARKER_SIZE, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(background);
 
@@ -502,7 +514,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
-    // You might want to add these methods for better lifecycle management
+    // Lifecycle management: onResume, onPause, onDestroy
     @Override
     public void onResume() {
         super.onResume();
@@ -516,7 +528,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     public void onPause() {
         super.onPause();
         Log.d(TAG, "onPause: MapFragment paused");
-        // You might want to stop location updates here if you're using them
+        // Stop location updates if necessary
     }
 
     @Override
@@ -526,8 +538,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         // Perform any final cleanup here
     }
 
-    // Helper method to log the current state of markers
     private void logMarkerState() {
+        // Log the current state of markers
         Log.d(TAG, "Current marker state:");
         for (Map.Entry<String, Marker> entry : markers.entrySet()) {
             Log.d(TAG, "User ID: " + entry.getKey() + ", Position: " + entry.getValue().getPosition());
