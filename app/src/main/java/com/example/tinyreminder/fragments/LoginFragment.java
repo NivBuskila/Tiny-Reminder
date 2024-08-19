@@ -38,10 +38,19 @@ public class LoginFragment extends Fragment {
 
     private static final String TAG = "LoginFragment";
 
-    private FragmentLoginBinding binding;  // Binding for the login fragment layout
-    private FirebaseAuth firebaseAuth;  // Firebase authentication instance
-    private FirebaseAuth.AuthStateListener authStateListener;  // Listener for authentication state changes
-    private DatabaseManager dbManager;  // Database manager for user data
+    // Binding for the login fragment layout
+    private FragmentLoginBinding binding;
+
+    // Firebase authentication instance
+    private FirebaseAuth firebaseAuth;
+
+    // Listener for authentication state changes
+    private FirebaseAuth.AuthStateListener authStateListener;
+
+    // Database manager for user data
+    private DatabaseManager dbManager;
+
+    // Launcher for the sign-in activity result
     private final ActivityResultLauncher<Intent> signInLauncher = registerForActivityResult(
             new FirebaseAuthUIActivityResultContract(),
             this::onSignInResult
@@ -70,6 +79,7 @@ public class LoginFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
+        // Inflate the layout using view binding
         binding = FragmentLoginBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
@@ -78,6 +88,7 @@ public class LoginFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        // Set up the login button click listener
         binding.loginButton.setOnClickListener(v -> signIn());
     }
 
@@ -97,6 +108,7 @@ public class LoginFragment extends Fragment {
         }
     }
 
+    // Method to initiate the sign-in process
     private void signIn() {
         List<AuthUI.IdpConfig> providers = Arrays.asList(
                 new AuthUI.IdpConfig.EmailBuilder().build(),
@@ -118,6 +130,7 @@ public class LoginFragment extends Fragment {
         signInLauncher.launch(signInIntent);
     }
 
+    // Handle the result of the sign-in process
     private void onSignInResult(FirebaseAuthUIAuthenticationResult result) {
         Log.d(TAG, "LoginFragment: onSignInResult called");
         IdpResponse response = result.getIdpResponse();
@@ -134,6 +147,7 @@ public class LoginFragment extends Fragment {
         }
     }
 
+    // Check if the user already exists in the database
     private void checkExistingUser(String userId, FirebaseUser firebaseUser) {
         dbManager.getUserData(userId, new ValueEventListener() {
             @Override
@@ -154,6 +168,7 @@ public class LoginFragment extends Fragment {
         });
     }
 
+    // Update the user's information in the database if they already exist
     private void updateExistingUser(User existingUser, FirebaseUser firebaseUser) {
         if (existingUser == null) {
             Log.e(TAG, "updateExistingUser: existingUser is null");
@@ -177,7 +192,7 @@ public class LoginFragment extends Fragment {
         });
     }
 
-
+    // Create a new user in the database if they don't exist
     private void createNewUser(String userId, FirebaseUser firebaseUser) {
         final String displayName = firebaseUser.getDisplayName() != null ? firebaseUser.getDisplayName() :
                 (firebaseUser.getEmail() != null ? firebaseUser.getEmail().split("@")[0] : "User");
@@ -202,12 +217,14 @@ public class LoginFragment extends Fragment {
         });
     }
 
+    // Create and save an avatar for the user
     private void createAndSaveUserAvatar(String userId, String displayName) {
         String initials = AvatarUtils.getInitials(displayName);
         int color = AvatarUtils.getRandomColor();
         AvatarUtils.saveAvatarData(userId, initials, color);
     }
 
+    // Update the user's display name in Firebase Authentication
     private void updateUserDisplayName(FirebaseUser firebaseUser, String displayName) {
         UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
                 .setDisplayName(displayName)
@@ -223,6 +240,7 @@ public class LoginFragment extends Fragment {
                 });
     }
 
+    // Handle sign-in errors and provide appropriate feedback
     private void handleSignInError(IdpResponse response) {
         if (response == null) {
             Log.d(TAG, "Sign in cancelled by user");
@@ -234,6 +252,7 @@ public class LoginFragment extends Fragment {
         }
     }
 
+    // Check and create a user avatar if it doesn't exist
     private void checkAndCreateUserAvatar(String userId, String displayName) {
         AvatarUtils.loadAvatarData(userId, displayName, (initials, color) -> {
             if (initials == null || color == 0) {
@@ -244,12 +263,12 @@ public class LoginFragment extends Fragment {
         });
     }
 
+    // Navigate to the profile screen after successful sign-in
     private void navigateToProfileScreen() {
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).loadFragment(new ProfileFragment());
         }
     }
-
 
     @Override
     public void onDestroyView() {

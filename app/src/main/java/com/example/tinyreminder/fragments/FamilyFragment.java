@@ -55,6 +55,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Initialize BroadcastReceiver to listen for family status changes
         statusChangeReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -66,6 +67,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     @Override
     public void onResume() {
         super.onResume();
+        // Register the BroadcastReceiver to listen for family status changes
         IntentFilter filter = new IntentFilter("com.example.tinyreminder.FAMILY_STATUS_CHANGED");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requireActivity().registerReceiver(statusChangeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
@@ -78,6 +80,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     @Override
     public void onPause() {
         super.onPause();
+        // Unregister the BroadcastReceiver when the fragment is paused
         if (statusChangeReceiver != null) {
             requireActivity().unregisterReceiver(statusChangeReceiver);
         }
@@ -86,6 +89,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
+        // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_family, container, false);
         familyMembersList = view.findViewById(R.id.family_members_list);
         noMembersTextView = view.findViewById(R.id.no_members_text);
@@ -97,12 +101,14 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        // Initialize the DatabaseManager and set up the RecyclerView and buttons
         dbManager = new DatabaseManager(requireContext());
         setupRecyclerView();
         setupButtons();
         loadFamilyMembers();
     }
 
+    // Set up the RecyclerView to display the list of family members
     private void setupRecyclerView() {
         adapter = new FamilyMemberAdapter(new ArrayList<>(), this);
         familyMembersList.setAdapter(adapter);
@@ -110,11 +116,13 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         familyMembersList.setHasFixedSize(true);
     }
 
+    // Set up the add and remove member buttons with click listeners
     private void setupButtons() {
         addMemberButton.setOnClickListener(v -> showAddMemberDialog());
         removeMemberButton.setOnClickListener(v -> showRemoveMemberDialog());
     }
 
+    // Load the family members from the database
     private void loadFamilyMembers() {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null) return;
@@ -130,6 +138,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                     // Clear existing members list before fetching new data
                     adapter.updateMembers(new ArrayList<>());
 
+                    // Fetch the family members and check admin status
                     fetchFamilyMembers(currentFamilyId);
                     checkAdminStatus(currentUser.getUid(), currentFamilyId);
                 } else {
@@ -148,8 +157,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         });
     }
 
-
-
+    // Fetch the family members from the database and update the adapter
     private void fetchFamilyMembers(String familyId) {
         dbManager.getFamilyMembersWithChildEventListener(familyId, new ChildEventListener() {
             List<FamilyMember> members = new ArrayList<>();
@@ -198,12 +206,12 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
 
             @Override
             public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
-                // ניתן לטפל כאן בהסרה של חבר משפחה אם יש צורך
+                // Handle removal of a family member if needed
             }
 
             @Override
             public void onChildMoved(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
-                // ניתן לטפל כאן בהזזה של חבר משפחה אם יש צורך
+                // Handle moving of a family member if needed
             }
 
             @Override
@@ -213,9 +221,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         });
     }
 
-
-
-
+    // Update or add a family member to the list and refresh the adapter
     private void updateOrAddMember(String memberId, User user, List<FamilyMember> members) {
         FamilyMember memberToUpdate = null;
 
@@ -227,10 +233,12 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         }
 
         if (memberToUpdate != null) {
+            // Update existing member's status and profile picture
             memberToUpdate.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
             memberToUpdate.setProfilePictureUrl(user.getProfilePictureUrl());
         } else {
-            FamilyMember newMember = new FamilyMember(user.getId(), user.getName(), "Member"); // או תפקיד מתאים אחר
+            // Add a new family member to the list
+            FamilyMember newMember = new FamilyMember(user.getId(), user.getName(), "Member"); // Or other appropriate role
             newMember.setProfilePictureUrl(user.getProfilePictureUrl());
             newMember.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
             members.add(newMember);
@@ -239,6 +247,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         adapter.updateMembers(members);
     }
 
+    // Update the status of a specific family member in the list
     private void updateMemberStatus(String memberId, String newStatus) {
         for (int i = 0; i < adapter.getMembers().size(); i++) {
             FamilyMember member = adapter.getMembers().get(i);
@@ -252,12 +261,14 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
 
 
     private void fetchMemberDetails(String memberId, final List<FamilyMember> members) {
+        // Fetch member data from the database using the memberId
         dbManager.getMemberData(memberId, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 User user = dataSnapshot.getValue(User.class);
                 if (user != null) {
                     boolean alreadyExists = false;
+                    // Check if the member already exists in the list
                     for (FamilyMember member : members) {
                         if (member.getId().equals(memberId)) {
                             alreadyExists = true;
@@ -265,11 +276,13 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                         }
                     }
                     if (!alreadyExists) {
+                        // Check if the user is an admin in the family
                         dbManager.checkIfUserIsAdmin(user.getId(), currentFamilyId, new ValueEventListener() {
                             @Override
                             public void onDataChange(@NonNull DataSnapshot adminSnapshot) {
                                 boolean isAdmin = adminSnapshot.exists() && adminSnapshot.getValue(Boolean.class);
                                 String role = isAdmin ? "Manager" : "Member";
+                                // Create a new FamilyMember object and add it to the list
                                 FamilyMember member = new FamilyMember(user.getId(), user.getName(), role);
                                 member.setProfilePictureUrl(user.getProfilePictureUrl());
                                 member.setResponseStatus(convertStatusToResponseStatus(user.getStatus()));
@@ -295,6 +308,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private FamilyMember.ResponseStatus convertStatusToResponseStatus(String status) {
+        // Convert the status string to the corresponding ResponseStatus enum
         if ("OK".equals(status)) {
             return FamilyMember.ResponseStatus.OK;
         } else if ("PENDING".equals(status)) {
@@ -305,8 +319,8 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         return FamilyMember.ResponseStatus.OK; // Default if status is unknown
     }
 
-
     private void updateUI(List<FamilyMember> members) {
+        // Update the UI on the main thread
         if (getActivity() == null) return;
 
         getActivity().runOnUiThread(() -> {
@@ -323,6 +337,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void showNoMembersMessage() {
+        // Show a message if there are no family members
         familyMembersList.setVisibility(View.GONE);
         noMembersTextView.setVisibility(View.VISIBLE);
         if (!isUserInFamily) {
@@ -333,6 +348,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void checkAdminStatus(String userId, String familyId) {
+        // Check if the current user is an admin in the family
         dbManager.checkIfUserIsAdmin(userId, familyId, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -348,6 +364,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void updateUIForAdminStatus() {
+        // Update the UI to show or hide admin controls based on the user's status
         if (isUserInFamily && isCurrentUserAdmin) {
             addMemberButton.setVisibility(View.VISIBLE);
             removeMemberButton.setVisibility(View.VISIBLE);
@@ -358,6 +375,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void showAddMemberDialog() {
+        // Show a dialog to add a new family member by phone number
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Add Family Member");
 
@@ -380,6 +398,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void addMemberByPhoneNumber(String phoneNumber) {
+        // Add a new family member by their phone number
         dbManager.getUserByPhoneNumber(phoneNumber, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
@@ -404,6 +423,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void addUserToFamily(User user) {
+        // Add the user to the current family
         if (user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
             Toast.makeText(getContext(), "User is already in a family", Toast.LENGTH_SHORT).show();
             return;
@@ -420,6 +440,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void showRemoveMemberDialog() {
+        // Show a dialog to remove a family member from the family
         List<FamilyMember> members = adapter.getMembers();
         if (members.isEmpty()) {
             Toast.makeText(getContext(), "No members to remove", Toast.LENGTH_SHORT).show();
@@ -439,6 +460,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void removeMemberFromFamily(FamilyMember member) {
+        // Remove the selected member from the family
         dbManager.removeUserFromFamily(member.getId(), currentFamilyId, task -> {
             if (task.isSuccessful()) {
                 Toast.makeText(getContext(), member.getName() + " removed from family", Toast.LENGTH_SHORT).show();
@@ -451,10 +473,11 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void checkAndDeleteEmptyFamily() {
+        // Check if the family has no members left and delete the family if necessary
         dbManager.getFamilyMembersWithChildEventListener(currentFamilyId, new ChildEventListener() {
             @Override
             public void onChildAdded(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
-                // אם יש חברי משפחה, לא צריך למחוק את המשפחה
+                // If there are family members, no need to delete the family
                 if (dataSnapshot.exists()) {
                     return;
                 }
@@ -462,17 +485,17 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
 
             @Override
             public void onChildChanged(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
-                // לא דרוש שינוי לוגיקה במקרה הזה
+                // No logic change needed for this case
             }
 
             @Override
             public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
-                // אם חבר משפחה נמחק ויש צורך לבדוק אם המשפחה ריקה
+                // If a family member is removed, check if the family is empty
                 dbManager.getFamilyMembersWithValueEventListener(currentFamilyId, new ValueEventListener() {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                         if (!dataSnapshot.exists() || dataSnapshot.getChildrenCount() == 0) {
-                            // אין חברי משפחה, אז יש למחוק את המשפחה
+                            // No family members left, delete the family
                             dbManager.deleteFamily(currentFamilyId, task -> {
                                 if (task.isSuccessful()) {
                                     Toast.makeText(getContext(), "Family deleted as it has no members left", Toast.LENGTH_SHORT).show();
@@ -493,7 +516,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
 
             @Override
             public void onChildMoved(@NonNull DataSnapshot dataSnapshot, @Nullable String previousChildName) {
-                // לא דרוש שינוי לוגיקה במקרה הזה
+                // No logic change needed for this case
             }
 
             @Override
@@ -503,8 +526,8 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         });
     }
 
-
     private void navigateToProfileScreen() {
+        // Navigate back to the profile screen if the family is deleted
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).navigateToProfile();
         }
@@ -512,10 +535,12 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
 
     @Override
     public void onMemberClick(FamilyMember member) {
+        // Handle click events on a family member
         showMemberOptionsDialog(member);
     }
 
     private void showMemberOptionsDialog(FamilyMember member) {
+        // Show a dialog with options for the selected family member
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle(member.getName());
 
@@ -537,6 +562,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
         builder.setItems(optionsArray, (dialog, which) -> {
             switch (optionsArray[which]) {
                 case "View Location":
+                    // View the location of the selected member
                     MapFragment mapFragment = MapFragment.newInstance(member.getId());
                     ((MainActivity) requireActivity()).loadFragment(mapFragment);
                     break;
@@ -549,7 +575,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                 case "Remove from Family":
                     removeMemberFromFamily(member);
                     break;
-                case "Leave Family": 
+                case "Leave Family":
                     leaveFamily(member);
                     break;
             }
@@ -558,6 +584,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void leaveFamily(FamilyMember member) {
+        // Allow the current user to leave the family
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null || !currentUser.getUid().equals(member.getId())) return;
 
@@ -578,8 +605,8 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
                 .show();
     }
 
-
     private void makeAdmin(FamilyMember member) {
+        // Make the selected family member an admin
         if (currentFamilyId == null) return;
         dbManager.addAdminToFamily(member.getId(), currentFamilyId, task -> {
             if (task.isSuccessful()) {
@@ -592,6 +619,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     }
 
     private void removeAdmin(FamilyMember member) {
+        // Remove admin privileges from the selected family member
         if (currentFamilyId == null) return;
         dbManager.removeAdminFromFamily(member.getId(), currentFamilyId, task -> {
             if (task.isSuccessful()) {

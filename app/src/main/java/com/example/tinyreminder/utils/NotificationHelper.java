@@ -10,7 +10,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -34,11 +33,16 @@ public class NotificationHelper {
     private static final String CHANNEL_DESCRIPTION = "Notifications for parking reminders";
     private static final long NOTIFICATION_TIMEOUT = 60 * 1000; // 1 minute in milliseconds
 
+    /**
+     * Sends a notification to the user to remind them about a parking event.
+     * The notification includes options to confirm or cancel the event.
+     */
     public static void sendParkingNotification(Context context, String userId, String eventId) {
-        createNotificationChannel(context);
+        createNotificationChannel(context); // Ensure the notification channel is created
         Log.d(TAG, "Preparing to send parking notification for user: " + userId);
-        int notificationId = (int) System.currentTimeMillis();
+        int notificationId = (int) System.currentTimeMillis(); // Generate a unique notification ID
 
+        // Create intent for the "Confirm" action in the notification
         Intent confirmIntent = new Intent(context, NotificationActionReceiver.class);
         confirmIntent.setAction("ACTION_CONFIRM");
         confirmIntent.putExtra("userId", userId);
@@ -47,34 +51,39 @@ public class NotificationHelper {
         PendingIntent confirmPendingIntent = PendingIntent.getBroadcast(context, notificationId * 2, confirmIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        // Create intent for the "Cancel" action in the notification
         Intent cancelIntent = new Intent(context, NotificationActionReceiver.class);
         cancelIntent.setAction("ACTION_CANCEL");
         cancelIntent.putExtra("userId", userId);
         cancelIntent.putExtra("eventId", eventId);
         cancelIntent.putExtra("notificationId", notificationId);
-
         PendingIntent cancelPendingIntent = PendingIntent.getBroadcast(context, notificationId * 2 + 1, cancelIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        // Build the notification
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification)
+                .setSmallIcon(R.drawable.ic_notification) // Set notification icon
                 .setContentTitle("Parking Reminder")
                 .setContentText("Is the child still in the car?")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setAutoCancel(true)
-                .addAction(R.drawable.ic_check, "Child is present", confirmPendingIntent)
-                .addAction(R.drawable.ic_close, "Child is not present", cancelPendingIntent);
+                .setPriority(NotificationCompat.PRIORITY_HIGH) // High priority for urgent notifications
+                .setCategory(NotificationCompat.CATEGORY_ALARM) // Alarm category for critical alerts
+                .setAutoCancel(true) // Auto-cancel the notification when tapped
+                .addAction(R.drawable.ic_check, "Child is present", confirmPendingIntent) // "Confirm" action
+                .addAction(R.drawable.ic_close, "Child is not present", cancelPendingIntent); // "Cancel" action
 
+        // Display the notification if the permission is granted
         NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
             notificationManager.notify(notificationId, builder.build());
-            setNotificationTimeout(context, userId, eventId, notificationId);
+            setNotificationTimeout(context, userId, eventId, notificationId); // Set timeout for the notification
         } else {
             Log.e(TAG, "Notification permission not granted");
         }
     }
 
+    /**
+     * Sets a timeout for the notification, triggering a timeout action if the user does not respond within the specified time.
+     */
     private static void setNotificationTimeout(Context context, String userId, String eventId, int notificationId) {
         Intent intent = new Intent(context, NotificationTimeoutReceiver.class);
         intent.putExtra("userId", userId);
@@ -86,6 +95,7 @@ public class NotificationHelper {
 
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager != null) {
+            // Set the exact alarm based on the Android version
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
                         System.currentTimeMillis() + NOTIFICATION_TIMEOUT, pendingIntent);
@@ -96,12 +106,16 @@ public class NotificationHelper {
         }
     }
 
-
+    /**
+     * Sends a notification to all family members except the specified user.
+     * This is used to alert family members about potential issues.
+     */
     public static void sendFamilyNotificationExceptUser(Context context, String familyId, String excludeUserId) {
         DatabaseManager dbManager = new DatabaseManager(context);
         dbManager.getFamilyMembersWithValueEventListener(familyId, new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                // Iterate through all family members
                 for (DataSnapshot memberSnapshot : dataSnapshot.getChildren()) {
                     String memberId = memberSnapshot.getKey();
                     if (memberId != null && !memberId.equals(excludeUserId)) {
@@ -118,7 +132,9 @@ public class NotificationHelper {
         });
     }
 
-
+    /**
+     * Sends a notification to a specific family member.
+     */
     public static void sendNotificationToMember(Context context, String memberId, String title, String message) {
         DatabaseManager dbManager = new DatabaseManager(context);
         dbManager.getUserData(memberId, new ValueEventListener() {
@@ -145,23 +161,27 @@ public class NotificationHelper {
         });
     }
 
-
+    /**
+     * Displays a notification to a user.
+     */
     private static void showNotification(Context context, String userId, String title, String message) {
         createNotificationChannel(context);
-        int notificationId = (int) System.currentTimeMillis();
+        int notificationId = (int) System.currentTimeMillis(); // Generate a unique notification ID
 
+        // Create intent to open the main activity when the notification is tapped
         Intent intent = new Intent(context, MainActivity.class);
         intent.putExtra("userId", userId);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        // Build and show the notification
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(true);
+                .setAutoCancel(true); // Auto-cancel the notification when tapped
 
         NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
@@ -172,25 +192,27 @@ public class NotificationHelper {
         }
     }
 
-
-
-
+    /**
+     * Sends a notification to a specific user.
+     */
     private static void sendNotification(Context context, User user, String title, String message) {
         createNotificationChannel(context);
-        int notificationId = (int) System.currentTimeMillis();
+        int notificationId = (int) System.currentTimeMillis(); // Generate a unique notification ID
 
+        // Create intent to open the main activity when the notification is tapped
         Intent intent = new Intent(context, MainActivity.class);
         intent.putExtra("userId", user.getId());
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        // Build and show the notification
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(true);
+                .setAutoCancel(true); // Auto-cancel the notification when tapped
 
         NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
@@ -201,6 +223,9 @@ public class NotificationHelper {
         }
     }
 
+    /**
+     * Creates the notification channel required for Android 8.0 (Oreo) and above.
+     */
     private static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);

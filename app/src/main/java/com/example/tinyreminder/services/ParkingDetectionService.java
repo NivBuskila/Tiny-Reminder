@@ -37,17 +37,18 @@ public class ParkingDetectionService extends Service {
     private static final long PARKING_TIME_THRESHOLD = 120000; // 2 minutes in milliseconds
     private static final float MIN_DISTANCE_CHANGE = 10; // meters
     private static final int LOCATION_INTERVAL = 5000; // 5 seconds
-    private static final float MS_TO_KMH = 3.6f;
+    private static final float MS_TO_KMH = 3.6f; // Conversion from m/s to km/h
     private static final int NOTIFICATION_ID = 1;
     private static final String CHANNEL_ID = "LocationServiceChannel";
 
+    // Enum to represent the state of the vehicle
     private enum VehicleState {
         PARKED,
         DRIVING,
         POTENTIAL_PARKING
     }
 
-    private VehicleState currentState = VehicleState.PARKED;
+    private VehicleState currentState = VehicleState.PARKED; // Initial state
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
     private Location lastLocation;
@@ -60,18 +61,24 @@ public class ParkingDetectionService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "ParkingDetectionService onCreate called");
+
+        // Create a notification channel for foreground service
         createNotificationChannel();
         dbManager = new DatabaseManager(this);
+
+        // Build the notification and start the service in the foreground
         Notification notification = buildNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
         }
-        Log.d(TAG, "ParkingDetectionService created");
+
+        // Initialize the fused location provider and start location updates
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         createLocationCallback();
         startLocationUpdates();
     }
 
+    // Method to create a notification channel
     private void createNotificationChannel() {
         NotificationChannel serviceChannel = new NotificationChannel(
                 CHANNEL_ID,
@@ -82,6 +89,7 @@ public class ParkingDetectionService extends Service {
         manager.createNotificationChannel(serviceChannel);
     }
 
+    // Method to build the notification for the foreground service
     private Notification buildNotification() {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
@@ -94,6 +102,7 @@ public class ParkingDetectionService extends Service {
                 .build();
     }
 
+    // Method to create a location callback to handle location updates
     private void createLocationCallback() {
         locationCallback = new LocationCallback() {
             @Override
@@ -101,6 +110,7 @@ public class ParkingDetectionService extends Service {
                 if (locationResult == null) {
                     return;
                 }
+                // Process each new location update
                 for (Location location : locationResult.getLocations()) {
                     processNewLocation(location);
                 }
@@ -108,6 +118,7 @@ public class ParkingDetectionService extends Service {
         };
     }
 
+    // Method to process a new location update
     private void processNewLocation(Location location) {
         Log.d(TAG, "Received new location: " + location.getLatitude() + ", " + location.getLongitude());
 
@@ -116,6 +127,7 @@ public class ParkingDetectionService extends Service {
             return;
         }
 
+        // Calculate the speed based on the distance and time between the last and current location
         long timeDelta = (location.getTime() - lastLocation.getTime()) / 1000; // seconds
         float distance = lastLocation.distanceTo(location);
         float speed = (distance / timeDelta) * MS_TO_KMH; // km/h
@@ -123,6 +135,7 @@ public class ParkingDetectionService extends Service {
         Log.d(TAG, "Current speed: " + speed + " km/h");
         Log.d(TAG, "Current state: " + currentState);
 
+        // Update the state of the vehicle based on the speed
         switch (currentState) {
             case PARKED:
                 if (speed > DRIVING_SPEED_THRESHOLD) {
@@ -155,6 +168,7 @@ public class ParkingDetectionService extends Service {
         lastSpeed = speed;
     }
 
+    // Method to check if the parking conditions are met
     private boolean isParkingDetected(Location location, float speed) {
         long currentTime = System.currentTimeMillis();
         long stationaryDuration = currentTime - stationaryStartTime;
@@ -172,6 +186,7 @@ public class ParkingDetectionService extends Service {
         return isSpeedLow && isStationaryLongEnough && hasNotMovedMuch;
     }
 
+    // Method to send a parking notification and create a parking event in the database
     private void sendParkingNotification() {
         String userId = getCurrentUserId();
         if (userId != null) {
@@ -198,6 +213,7 @@ public class ParkingDetectionService extends Service {
         }
     }
 
+    // Helper method to get the current user's ID
     private String getCurrentUserId() {
         FirebaseAuth auth = FirebaseAuth.getInstance();
         if (auth.getCurrentUser() != null) {
@@ -207,6 +223,7 @@ public class ParkingDetectionService extends Service {
         return null;
     }
 
+    // Method to start location updates
     private void startLocationUpdates() {
         LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, LOCATION_INTERVAL)
                 .setMinUpdateIntervalMillis(LOCATION_INTERVAL)
@@ -226,6 +243,7 @@ public class ParkingDetectionService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        // Stop location updates when the service is destroyed
         fusedLocationClient.removeLocationUpdates(locationCallback);
         Log.d(TAG, "ParkingDetectionService destroyed");
     }
@@ -233,6 +251,6 @@ public class ParkingDetectionService extends Service {
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return null; // This service is not designed for binding
     }
 }
