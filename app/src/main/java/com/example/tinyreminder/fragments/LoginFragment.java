@@ -63,7 +63,7 @@ public class LoginFragment extends Fragment {
         };
 
         // Initialize the DatabaseManager
-        dbManager = new DatabaseManager();
+        dbManager = new DatabaseManager(requireContext());
     }
 
     @Nullable

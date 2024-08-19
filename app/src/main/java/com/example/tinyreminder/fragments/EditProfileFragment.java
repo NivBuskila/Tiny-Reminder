@@ -67,7 +67,7 @@ public class EditProfileFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        dbManager = new DatabaseManager();
+        dbManager = new DatabaseManager(requireContext());
         initViews();
         setupButtons();
     }

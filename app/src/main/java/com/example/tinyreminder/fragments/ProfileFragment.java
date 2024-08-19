@@ -53,7 +53,7 @@ public class ProfileFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "ProfileFragment: onCreate");
-        dbManager = new DatabaseManager();
+        dbManager = new DatabaseManager(requireContext());
         mAuth = FirebaseAuth.getInstance();
     }
     @Override

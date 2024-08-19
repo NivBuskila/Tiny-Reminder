@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         mAuth = FirebaseAuth.getInstance();
-        dbManager = new DatabaseManager();
+        dbManager = new DatabaseManager(this);
 
         createNotificationChannel();
         setupFirebaseMessaging();
@@ -119,6 +119,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this,
                     new String[]{
                             Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
                             Manifest.permission.FOREGROUND_SERVICE_LOCATION
                     },
                     LOCATION_PERMISSION_REQUEST_CODE);

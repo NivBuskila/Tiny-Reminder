@@ -27,7 +27,7 @@
                 return;
             }
 
-            DatabaseManager dbManager = new DatabaseManager();
+            DatabaseManager dbManager = new DatabaseManager(context);
             dbManager.getParkingEvent(eventId, new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot dataSnapshot) {

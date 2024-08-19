@@ -60,6 +60,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private static final int MARKER_SIZE = 120; // Size for the marker in pixels
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private static final int MAP_PADDING = 100; // pixels
+
+    private static final float MIN_DISTANCE_FOR_UPDATE = 50f; // 50 METERS
     private static final float DEFAULT_ZOOM = 15f;
     private static final float MAX_ZOOM = 18f;
     private boolean isNavigatedFromBottomNav = false;
@@ -68,11 +70,12 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private static final long ZOOM_ADJUSTMENT_COOLDOWN = 10000; // 10 seconds
     private GoogleMap map;
     private String memberId;
+    private String currentUserFamilyId;
 
     private DatabaseManager dbManager;
     private Map<String, Marker> markers = new HashMap<>();
     private Map<String, LatLng> lastKnownLocations = new HashMap<>();
-    private LatLngBounds.Builder boundsBuilder;
+
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
     private FloatingActionButton btnMyLocation;
@@ -105,9 +108,27 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 memberId = currentUser.getUid();
             }
         }
+
+        dbManager = new DatabaseManager(requireContext());
+
+        // קבל את ה-familyId של המשתמש הנוכחי
+        dbManager.getUserData(memberId, new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                User currentUser = snapshot.getValue(User.class);
+                if (currentUser != null) {
+                    currentUserFamilyId = currentUser.getFamilyId();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Error fetching current user data: ", error.toException());
+            }
+        });
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
-        dbManager = new DatabaseManager();
-        boundsBuilder = new LatLngBounds.Builder();
+
         Log.d(TAG, "onCreate: Fragment created with member ID: " + memberId);
     }
 
@@ -130,15 +151,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         return view;
     }
 
-    private void fitAllMarkers() {
-        if (!markers.isEmpty()) {
-            boundsBuilder = new LatLngBounds.Builder();
-            for (Marker marker : markers.values()) {
-                boundsBuilder.include(marker.getPosition());
-            }
-            adjustMapZoom();
-        }
-    }
+
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -271,6 +284,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 if (user != null && user.getFamilyId() != null && !user.getFamilyId().isEmpty()) {
                     Log.d(TAG, "onDataChange: User data retrieved. Family ID: " + user.getFamilyId());
                     setupRealtimeFamilyLocationUpdates(user.getFamilyId());
+                    // Focus on the specific member if one is selected
+                    if (!isNavigatedFromBottomNav) {
+                        focusOnMember(memberId);
+                    }
                 } else {
                     Log.d(TAG, "onDataChange: User does not belong to a family");
                     showNoFamilyMessage();
@@ -283,6 +300,16 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 Toast.makeText(getContext(), "Failed to load user data", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void focusOnMember(String memberId) {
+        Marker marker = markers.get(memberId);
+        if (marker != null) {
+            LatLng position = marker.getPosition();
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(position, DEFAULT_ZOOM));
+        } else {
+            Log.w(TAG, "focusOnMember: Marker not found for member ID: " + memberId);
+        }
     }
 
     private void setupRealtimeFamilyLocationUpdates(String familyId) {
@@ -298,6 +325,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                         updateMemberMarker(memberId, newLocation);
                     }
                 }
+
             }
 
             @Override
@@ -307,35 +335,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
-    private void updateMapView() {
-        if (map == null || markers.isEmpty()) {
-            return;
-        }
-
-        LatLngBounds.Builder builder = new LatLngBounds.Builder();
-        for (Marker marker : markers.values()) {
-            builder.include(marker.getPosition());
-        }
-        LatLngBounds bounds = builder.build();
-
-        int padding = 100;
-        CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, padding);
-
-        map.animateCamera(cu, new GoogleMap.CancelableCallback() {
-            @Override
-            public void onFinish() {
-
-                if (map.getCameraPosition().zoom > MAX_ZOOM) {
-                    map.animateCamera(CameraUpdateFactory.zoomTo(MAX_ZOOM));
-                }
-            }
-
-            @Override
-            public void onCancel() {
-
-            }
-        });
-    }
 
     private float distanceBetween(LatLng point1, LatLng point2) {
         float[] results = new float[1];
@@ -347,107 +346,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         Toast.makeText(getContext(), "You are not part of a family. Please join or create a family first.", Toast.LENGTH_LONG).show();
     }
 
-    private void fetchFamilyLocations(String familyId) {
-        Log.d(TAG, "fetchFamilyLocations: Fetching locations for family ID: " + familyId);
-        boundsBuilder = new LatLngBounds.Builder();
-        dbManager.getLocationsForFamily(familyId, task -> {
-            if (task.isSuccessful()) {
-                Map<String, LatLng> familyLocations = task.getResult();
-                Log.d(TAG, "fetchFamilyLocations: Received " + familyLocations.size() + " family member locations");
-                boolean hasLocations = false;
-                for (Map.Entry<String, LatLng> entry : familyLocations.entrySet()) {
-                    String memberId = entry.getKey();
-                    LatLng location = entry.getValue();
-                    updateMemberMarker(memberId, location); // כאן מעדכנים את המפה
-                    boundsBuilder.include(location);
-                    hasLocations = true;
-                }
-
-                if (hasLocations) {
-                    Log.d(TAG, "onDataChange: Valid locations found, adjusting map zoom");
-                    adjustMapZoom();
-                } else {
-                    Log.w(TAG, "onDataChange: No valid locations found for family members");
-                    Toast.makeText(getContext(), "No family member locations available", Toast.LENGTH_SHORT).show();
-                }
-            } else {
-                Log.e(TAG, "Error fetching family locations: ", task.getException());
-                Toast.makeText(getContext(), "Failed to load family locations", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-
-    private void adjustMapZoom() {
-        if (map == null || getView() == null) {
-            Log.e(TAG, "adjustMapZoom: Map or view is null");
-            return;
-        }
-
-        long currentTime = System.currentTimeMillis();
-        if (currentTime - lastZoomAdjustment < ZOOM_ADJUSTMENT_COOLDOWN) {
-            Log.d(TAG, "adjustMapZoom: Skipping zoom adjustment due to cooldown");
-            return;
-        }
-
-        if (markers.isEmpty()) {
-            Log.w(TAG, "adjustMapZoom: No markers to adjust zoom for");
-            return;
-        }
-
-        try {
-            LatLngBounds.Builder builder = new LatLngBounds.Builder();
-            for (Marker marker : markers.values()) {
-                builder.include(marker.getPosition());
-            }
-            LatLngBounds bounds = builder.build();
-
-            int width = getView().getWidth();
-            int height = getView().getHeight();
-            if (width == 0 || height == 0) {
-                Log.w(TAG, "adjustMapZoom: View has no dimensions, postponing zoom adjustment");
-                return;
-            }
-
-            CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, width, height, MAP_PADDING);
-
-            LatLngBounds currentBounds = map.getProjection().getVisibleRegion().latLngBounds;
-            boolean allMarkersVisible = true;
-            for (Marker marker : markers.values()) {
-                if (!currentBounds.contains(marker.getPosition())) {
-                    allMarkersVisible = false;
-                    break;
-                }
-            }
-
-            if (!allMarkersVisible) {
-                map.animateCamera(cu, new GoogleMap.CancelableCallback() {
-                    @Override
-                    public void onFinish() {
-                        // Ensure we're not zoomed in too far
-                        if (map.getCameraPosition().zoom > DEFAULT_ZOOM) {
-                            map.animateCamera(CameraUpdateFactory.zoomTo(DEFAULT_ZOOM));
-                        }
-                        lastZoomAdjustment = System.currentTimeMillis();
-                    }
-
-                    @Override
-                    public void onCancel() {
-                        Log.d(TAG, "Map animation cancelled");
-                    }
-                });
-            }
-        } catch (IllegalStateException e) {
-            Log.e(TAG, "adjustMapZoom: Error adjusting map zoom", e);
-            // Fallback to default zoom on a single location if bounds are invalid
-            if (!markers.isEmpty()) {
-                Marker firstMarker = markers.values().iterator().next();
-                Log.d(TAG, "adjustMapZoom: Falling back to single marker zoom");
-                map.animateCamera(CameraUpdateFactory.newLatLngZoom(firstMarker.getPosition(), DEFAULT_ZOOM));
-                lastZoomAdjustment = System.currentTimeMillis();
-            }
-        }
-    }
 
     private void updateMemberMarker(String memberId, LatLng location) {
         Log.d(TAG, "updateMemberMarker: Updating marker for member: " + memberId);
@@ -455,11 +353,16 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 User user = snapshot.getValue(User.class);
-                if (user != null) {
-                    Log.d(TAG, "onDataChange: User data retrieved for member: " + memberId);
-                    createOrUpdateMarker(user, location);
+                if (user != null && user.getFamilyId() != null && user.getFamilyId().equals(currentUserFamilyId)) {
+                    Log.d(TAG, "onDataChange: User belongs to the same family. Updating marker for member: " + memberId);
+
+                    LatLng lastKnownLocation = markers.containsKey(memberId) ? markers.get(memberId).getPosition() : null;
+                    if (lastKnownLocation == null || distanceBetween(lastKnownLocation, location) > MIN_DISTANCE_FOR_UPDATE) {
+                        createOrUpdateMarker(user, location);
+
+                    }
                 } else {
-                    Log.w(TAG, "onDataChange: User data is null for member ID: " + memberId);
+                    Log.d(TAG, "onDataChange: User does not belong to the same family. Skipping update for member: " + memberId);
                 }
             }
 
@@ -469,6 +372,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             }
         });
     }
+
 
     private void createOrUpdateMarker(User user, LatLng location) {
         Log.d(TAG, "createOrUpdateMarker: Creating/Updating marker for user: " + user.getId());
@@ -563,6 +467,11 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 }
                 Marker marker = map.addMarker(markerOptions);
                 markers.put(userId, marker);
+            }
+
+            // If this is the focused member, ensure they're visible
+            if (userId.equals(memberId) && !isNavigatedFromBottomNav) {
+                focusOnMember(userId);
             }
         } else {
             Log.e(TAG, "addOrUpdateMarkerOnMap: Map is null");

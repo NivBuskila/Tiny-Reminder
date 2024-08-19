@@ -61,7 +61,7 @@ public class ParkingDetectionService extends Service {
         super.onCreate();
         Log.d(TAG, "ParkingDetectionService onCreate called");
         createNotificationChannel();
-        dbManager = new DatabaseManager();
+        dbManager = new DatabaseManager(this);
         Notification notification = buildNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);

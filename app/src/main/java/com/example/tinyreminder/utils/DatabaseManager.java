@@ -1,5 +1,7 @@
     package com.example.tinyreminder.utils;
 
+    import android.content.Context;
+    import android.content.Intent;
     import android.net.Uri;
     import android.util.Log;
 
@@ -29,8 +31,13 @@
         private static final String TAG = "DatabaseManager";
         private DatabaseReference mDatabase;
         private StorageReference mStorage;
+        private Context context;
 
-        public DatabaseManager() {
+
+
+
+        public DatabaseManager(Context context) {
+            this.context = context.getApplicationContext();
             mDatabase = FirebaseDatabase.getInstance().getReference();
             mStorage = FirebaseStorage.getInstance().getReference();
         }
@@ -161,7 +168,11 @@
             locationUpdates.put("longitude", longitude);
 
             if (familyId != null) {
-                return mDatabase.child("families").child(familyId).child("memberLocations").child(userId).setValue(locationUpdates);
+                return mDatabase.child("families").child(familyId).child("memberLocations").child(userId).setValue(locationUpdates)
+                        .addOnSuccessListener(aVoid -> {
+                            Intent intent = new Intent("com.example.tinyreminder.FAMILY_STATUS_CHANGED");
+                            context.sendBroadcast(intent);
+                        });
             } else {
                 return Tasks.forException(new Exception("User is not in a family"));
             }
@@ -175,7 +186,11 @@
                     .addOnCompleteListener(listener);
         }
         public Task<Void> updateUserAlertStatus(String userId, boolean isAlerted) {
-            return mDatabase.child("users").child(userId).child("isAlerted").setValue(isAlerted);
+            return mDatabase.child("users").child(userId).child("isAlerted").setValue(isAlerted)
+                    .addOnSuccessListener(aVoid -> {
+                        Intent intent = new Intent("com.example.tinyreminder.FAMILY_STATUS_CHANGED");
+                        context.sendBroadcast(intent);
+                    });
         }
         public void checkIfUserIsAdmin(String userId, String familyId, final ValueEventListener listener) {
             mDatabase.child("families").child(familyId).child("adminIds").child(userId)
@@ -240,9 +255,12 @@
 
 
         public Task<Void> setUserStatus(String userId, String status) {
-            return mDatabase.child("users").child(userId).child("status").setValue(status);
+            return mDatabase.child("users").child(userId).child("status").setValue(status)
+                    .addOnSuccessListener(aVoid -> {
+                        Intent intent = new Intent("com.example.tinyreminder.FAMILY_STATUS_CHANGED");
+                        context.sendBroadcast(intent);
+                    });
         }
-
         public void getUserStatus(String userId, final ValueEventListener listener) {
             mDatabase.child("users").child(userId).child("status").addValueEventListener(listener);
         }

@@ -96,7 +96,7 @@ public class FamilyFragment extends Fragment implements FamilyMemberAdapter.OnMe
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        dbManager = new DatabaseManager();
+        dbManager = new DatabaseManager(requireContext());
         setupRecyclerView();
         setupButtons();
         loadFamilyMembers();

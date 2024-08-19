@@ -32,7 +32,7 @@ public class NotificationActionReceiver extends BroadcastReceiver {
             return;
         }
 
-        DatabaseManager dbManager = new DatabaseManager();
+        DatabaseManager dbManager = new DatabaseManager(context);
 
         if ("ACTION_CONFIRM".equals(action) || "ACTION_CANCEL".equals(action)) {
             String newStatus = action.equals("ACTION_CONFIRM") ? "CHILD_PRESENT" : "CHILD_NOT_PRESENT";

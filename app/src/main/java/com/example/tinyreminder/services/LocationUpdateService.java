@@ -54,7 +54,7 @@ public class LocationUpdateService extends Service {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
         }
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        dbManager = new DatabaseManager();
+        dbManager = new DatabaseManager(this);
         getUserFamilyId();
 
         locationCallback = new LocationCallback() {
@@ -117,6 +117,10 @@ public class LocationUpdateService extends Service {
         String userId = getUserId();
         if (userId != null && familyId != null) {
             dbManager.updateMemberLocation(userId, familyId, location.getLatitude(), location.getLongitude())
+                    .addOnSuccessListener(aVoid -> {
+                        Intent intent = new Intent("com.example.tinyreminder.FAMILY_STATUS_CHANGED");
+                        sendBroadcast(intent);
+                    })
                     .addOnFailureListener(e -> Log.e(TAG, "Failed to update location", e));
         }
     }
